@@ -364,66 +364,81 @@ wint_t my_getwc(FILE * s)
 #endif	/* WITH_WATCH8BIT */
 
 #ifdef WITH_WATCH8BIT
-static void output_header(wchar_t *restrict wcommand, int wcommand_columns, int wcommand_characters, double interval)
+static void output_header(wchar_t *restrict wcommand, int wcommand_characters, double interval)
 #else
 static void output_header(char *restrict command, double interval)
 #endif	/* WITH_WATCH8BIT */
 {
 	time_t t = time(NULL);
 	char *ts = ctime(&t);
-	int tsl = strlen(ts);
 	char *header;
+	char *right_header;
+	char hostname[HOST_NAME_MAX + 1];
+	int command_columns = 0;	/* not including final \0 */
+
+	gethostname(hostname, sizeof(hostname));
 
 	/*
-	 * left justify interval and command, right justify time,
+	 * left justify interval and command, right justify hostname and time,
 	 * clipping all to fit window width
 	 */
 	int hlen = asprintf(&header, _("Every %.1fs: "), interval);
+	int rhlen = asprintf(&right_header, _("%s: %s"), hostname, ts);
 
 	/*
 	 * the rules:
-	 *   width < tsl : print nothing
-	 *   width < tsl + hlen + 1: print ts
-	 *   width = tsl + hlen + 1: print header, ts
-	 *   width < tsl + hlen + 4: print header, ..., ts
-	 *   width < tsl + hlen +    wcommand_columns: print header,
-	 *                           truncated wcommand, ..., ts
-	 *   width > "": print header, wcomand, ts
+	 *   width < rhlen : print nothing
+	 *   width < rhlen + hlen + 1: print hostname, ts
+	 *   width = rhlen + hlen + 1: print header, hostname, ts
+	 *   width < rhlen + hlen + 4: print header, ..., hostname, ts
+	 *   width < rhlen + hlen + wcommand_columns: print header,
+	 *                           truncated wcommand, ..., hostname, ts
+	 *   width > "": print header, wcomand, hostname, ts
 	 * this is slightly different from how it used to be
 	 */
-	if (width < tsl) {
+	if (width < rhlen) {
 		free(header);
+		free(right_header);
 		return;
 	}
-	if (tsl + hlen + 1 <= width) {
+	if (rhlen + hlen + 1 <= width) {
 		mvaddstr(0, 0, header);
-		if (tsl + hlen + 2 <= width) {
-			if (width < tsl + hlen + 4) {
-				mvaddstr(0, width - tsl - 4, "... ");
+		if (rhlen + hlen + 2 <= width) {
+			if (width < rhlen + hlen + 4) {
+				mvaddstr(0, width - rhlen - 4, "... ");
 			} else {
 #ifdef WITH_WATCH8BIT
-				if (width < tsl + hlen + wcommand_columns) {
+	            command_columns = wcswidth(wcommand, -1);
+				if (width < rhlen + hlen + command_columns) {
 					/* print truncated */
-					int available = width - tsl - hlen;
-					int in_use = wcommand_columns;
+					int available = width - rhlen - hlen;
+					int in_use = command_columns;
 					int wcomm_len = wcommand_characters;
 					while (available - 4 < in_use) {
 						wcomm_len--;
 						in_use = wcswidth(wcommand, wcomm_len);
 					}
 					mvaddnwstr(0, hlen, wcommand, wcomm_len);
-					mvaddstr(0, width - tsl - 4, "... ");
+					mvaddstr(0, width - rhlen - 4, "... ");
 				} else {
 					mvaddwstr(0, hlen, wcommand);
 				}
 #else
-				mvaddnstr(0, hlen, command, width - tsl - hlen);
+                command_columns = strlen(command);
+                if (width < rhlen + hlen + command_columns) {
+                    /* print truncated */
+                    mvaddnstr(0, hlen, command, width - rhlen - hlen - 4);
+                    mvaddstr(0, width - rhlen - 4, "... ");
+                } else {
+                    mvaddnstr(0, hlen, command, width - rhlen - hlen);
+                }
 #endif	/* WITH_WATCH8BIT */
 			}
 		}
 	}
-	mvaddstr(0, width - tsl + 1, ts);
+	mvaddstr(0, width - rhlen + 1, right_header);
 	free(header);
+	free(right_header);
 	return;
 }
 
@@ -655,7 +670,6 @@ int main(int argc, char *argv[])
 				 * keeping only */
 #ifdef WITH_WATCH8BIT
 	wchar_t *wcommand = NULL;
-	int wcommand_columns = 0;	/* not including final \0 */
 	int wcommand_characters = 0;	/* not including final \0 */
 #endif	/* WITH_WATCH8BIT */
 
@@ -710,7 +724,7 @@ int main(int argc, char *argv[])
 			flags |= WATCH_EXEC;
 			break;
 		case 'n':
-			interval = strtod_or_err(optarg, _("failed to parse argument"));
+			interval = strtod_nol_or_err(optarg, _("failed to parse argument"));
 			if (interval < 0.1)
 				interval = 0.1;
 			if (interval > UINT_MAX)
@@ -767,7 +781,6 @@ int main(int argc, char *argv[])
 		exit(EXIT_FAILURE);
 	}
 	mbstowcs(wcommand, command, wcommand_characters + 1);
-	wcommand_columns = wcswidth(wcommand, -1);
 #endif	/* WITH_WATCH8BIT */
 
 	get_terminal_size();

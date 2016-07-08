@@ -43,7 +43,7 @@
 #include "proc/pwcache.h"
 #include "proc/sig.h"
 #include "proc/devname.h"
-#include "proc/procps.h"	/* char *user_from_uid(uid_t uid) */
+#include "proc/procps.h"	/* char *pwcache_get_user(uid_t uid) */
 #include "proc/readproc.h"
 #include "proc/version.h"	/* procps_version */
 #include "rpmatch.h"
@@ -134,7 +134,7 @@ static void hurt_proc(int tty, int uid, int pid, const char *restrict const cmd,
 		char *buf;
 		size_t len = 0;
 		fprintf(stderr, "%-8s %-8s %5d %-16.16s   ? ",
-			(char *)dn_buf, user_from_uid(uid), pid, cmd);
+			(char *)dn_buf, pwcache_get_user(uid), pid, cmd);
 		fflush (stdout);
 		if (getline(&buf, &len, stdin) == -1)
 			return;
@@ -152,7 +152,7 @@ static void hurt_proc(int tty, int uid, int pid, const char *restrict const cmd,
 		failed = setpriority(PRIO_PROCESS, pid, sig_or_pri);
 	if ((run_time->warnings && failed) || run_time->debugging || run_time->verbose) {
 		fprintf(stderr, "%-8s %-8s %5d %-16.16s   ",
-			(char *)dn_buf, user_from_uid(uid), pid, cmd);
+			(char *)dn_buf, pwcache_get_user(uid), pid, cmd);
 		perror("");
 		return;
 	}
@@ -479,7 +479,7 @@ static void __attribute__ ((__noreturn__))
 			} else {
 			    /* Special case for signal digit negative
 			     * PIDs */
-			    pid = (long)('0' - optopt);
+			    pid = atoi(argv[optind]);
 			    if (kill((pid_t)pid, signo) != 0)
 				exitvalue = EXIT_FAILURE;
 			    exit(exitvalue);
@@ -500,6 +500,7 @@ static void __attribute__ ((__noreturn__))
 		pid = strtol_or_err(argv[i], _("failed to parse argument"));
 		if (!kill((pid_t) pid, signo))
 			continue;
+        error(0, errno, "(%ld)", pid);
 		exitvalue = EXIT_FAILURE;
 		continue;
 	}

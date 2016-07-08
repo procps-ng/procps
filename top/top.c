@@ -252,6 +252,7 @@ static const char Graph_bars[] = "||||||||||||||||||||||||||||||||||||||||||||||
          * routine may serve more than one column.
          */
 
+SCB_STRS(CGN, cgname)
 SCB_STRS(CGR, cgroup[0])
 SCB_STRV(CMD, Frame_cmdlin, cmdline, cmd)
 SCB_NUM1(COD, trs)
@@ -275,15 +276,17 @@ SCB_NUM1(NS3, ns[NETNS])
 SCB_NUM1(NS4, ns[PIDNS])
 SCB_NUM1(NS5, ns[USERNS])
 SCB_NUM1(NS6, ns[UTSNS])
-#ifdef OOMEM_ENABLE
 SCB_NUM1(OOA, oom_adj)
 SCB_NUM1(OOM, oom_score)
-#endif
 SCB_NUMx(PGD, pgrp)
 SCB_NUMx(PID, tid)
 SCB_NUMx(PPD, ppid)
 SCB_NUMx(PRI, priority)
 SCB_NUM1(RES, vm_rss)                  // also serves MEM !
+SCB_NUM1(RZA, vm_rss_anon)
+SCB_NUM1(RZF, vm_rss_file)
+SCB_NUM1(RZL, vm_lock)
+SCB_NUM1(RZS, vm_rss_shared)
 SCB_STRX(SGD, supgid)
 SCB_STRS(SGN, supgrp)
 SCB_NUM1(SHR, share)
@@ -750,7 +753,11 @@ static void show_msg (const char *str) {
 static int show_pmt (const char *str) {
    int rc;
 
+#ifdef PRETENDNOCAP
+   PUTT("\n%s%s%.*s %s%s%s"
+#else
    PUTT("%s%s%.*s %s%s%s"
+#endif
       , tg2(0, Msg_row)
       , Curwin->capclr_pmt
       , Screen_cols - 2
@@ -978,7 +985,7 @@ static int ioch (int ech, char *buf, unsigned cnt) {
    // it may have been the beginning of a lengthy escape sequence
    tcflush(STDIN_FILENO, TCIFLUSH);
 
-   // note: we do NOT produce a vaid 'string'
+   // note: we do NOT produce a valid 'string'
    return rc;
 } // end: ioch
 
@@ -1492,13 +1499,18 @@ static inline const char *make_chr (const char ch, int width, int justr) {
         /*
          * Make and then justify an integer NOT subject to scaling,
          * and include a visual clue should tuncation be necessary. */
-static inline const char *make_num (long num, int width, int justr, int col) {
+static inline const char *make_num (long num, int width, int justr, int col, int noz) {
    static char buf[SMLBUFSIZ];
+
+   buf[0] = '\0';
+   if (noz && Rc.zero_suppress && 0 == num)
+      goto end_justifies;
 
    if (width < snprintf(buf, sizeof(buf), "%ld", num)) {
       buf[width-1] = COLPLUSCH;
       AUTOX_COL(col);
    }
+end_justifies:
    return justify_pad(buf, width, justr);
 } // end: make_num
 
@@ -1676,6 +1688,7 @@ end_justifies:
 #define L_SUPGRP   PROC_FILLSTATUS | PROC_FILLSUPGRP
 #define L_NS       PROC_FILLNS
 #define L_LXC      PROC_FILL_LXC
+#define L_OOM      PROC_FILLOOM
    // make 'none' non-zero (used to be important to Frames_libflags)
 #define L_NONE     PROC_SPARE_1
    // from either 'stat' or 'status' (preferred), via bits not otherwise used
@@ -1756,12 +1769,8 @@ static FLD_t Fieldstab[] = {
    {    -1,     -1,  A_left,   SF(SGD),  L_status  },
    {    -1,     -1,  A_left,   SF(SGN),  L_SUPGRP  },
    {     0,     -1,  A_right,  SF(TGD),  L_status  },
-#ifdef OOMEM_ENABLE
-#define L_oom      PROC_FILLOOM
-   {     3,     -1,  A_right,  SF(OOA),  L_oom     },
-   {     8,     -1,  A_right,  SF(OOM),  L_oom     },
-#undef L_oom
-#endif
+   {     5,     -1,  A_right,  SF(OOA),  L_OOM     },
+   {     4,     -1,  A_right,  SF(OOM),  L_OOM     },
    {    -1,     -1,  A_left,   SF(ENV),  L_ENVIRON },
    {     3,     -1,  A_right,  SF(FV1),  L_stat    },
    {     3,     -1,  A_right,  SF(FV2),  L_stat    },
@@ -1776,7 +1785,19 @@ static FLD_t Fieldstab[] = {
    {    10,     -1,  A_right,  SF(NS4),  L_NS      }, // PIDNS
    {    10,     -1,  A_right,  SF(NS5),  L_NS      }, // USERNS
    {    10,     -1,  A_right,  SF(NS6),  L_NS      }, // UTSNS
-   {     8,     -1,  A_left,   SF(LXC),  L_LXC     }
+   {     8,     -1,  A_left,   SF(LXC),  L_LXC     },
+#ifndef NOBOOST_MEMS
+   {     6,  SK_Kb,  A_right,  SF(RZA),  L_status  },
+   {     6,  SK_Kb,  A_right,  SF(RZF),  L_status  },
+   {     6,  SK_Kb,  A_right,  SF(RZL),  L_status  },
+   {     6,  SK_Kb,  A_right,  SF(RZS),  L_status  },
+#else
+   {     4,  SK_Kb,  A_right,  SF(RZA),  L_status  },
+   {     4,  SK_Kb,  A_right,  SF(RZF),  L_status  },
+   {     4,  SK_Kb,  A_right,  SF(RZL),  L_status  },
+   {     4,  SK_Kb,  A_right,  SF(RZS),  L_status  },
+#endif
+   {    -1,     -1,  A_left,   SF(CGN),  L_CGROUP  }
  #undef SF
  #undef A_left
  #undef A_right
@@ -2316,7 +2337,9 @@ static void zap_fieldstab (void) {
    Fieldstab[EU_VRT].scale = Fieldstab[EU_SWP].scale
       = Fieldstab[EU_RES].scale = Fieldstab[EU_COD].scale
       = Fieldstab[EU_DAT].scale = Fieldstab[EU_SHR].scale
-      = Fieldstab[EU_USE].scale = Rc.task_mscale;
+      = Fieldstab[EU_USE].scale = Fieldstab[EU_RZA].scale
+      = Fieldstab[EU_RZF].scale = Fieldstab[EU_RZL].scale
+      = Fieldstab[EU_RZS].scale = Rc.task_mscale;
 
    // lastly, ensure we've got proper column headers...
    calibrate_fields();
@@ -2672,30 +2695,26 @@ static void procs_refresh (void) {
          * portion of libproc.  In support of those hotpluggable resources,
          * the sampling frequencies are reduced so as to minimize overhead. */
 static void sysinfo_refresh (int forced) {
-   static time_t mem_secs, cpu_secs;
+   static time_t sav_secs;
    time_t cur_secs;
 
    if (forced)
-      mem_secs = cpu_secs = 0;
-   time(&cur_secs);
+      sav_secs = 0;
+   cur_secs = time(NULL);
 
    /*** hotplug_acclimated ***/
-   if (3 <= cur_secs - mem_secs) {
+   if (3 <= cur_secs - sav_secs) {
       meminfo();
-      mem_secs = cur_secs;
-   }
 #ifndef PRETEND8CPUS
-   /*** hotplug_acclimated ***/
-   if (60 <= cur_secs - cpu_secs) {
       cpuinfo();
       Cpu_faux_tot = smp_num_cpus;
-      cpu_secs = cur_secs;
 #ifndef NUMA_DISABLE
       if (Libnuma_handle)
          Numa_node_tot = Numa_max_node() + 1;
 #endif
-   }
 #endif
+      sav_secs = cur_secs;
+   }
 } // end: sysinfo_refresh
 
 /*######  Inspect Other Output  ##########################################*/
@@ -2986,7 +3005,6 @@ static inline void insp_make_row (int col, int row) {
    int fr, to, ofs;
    int hicap = 0;
 
-   capNO;
    if (col < INSP_RLEN(row))
       memcpy(tline, Insp_p[row] + col, sizeof(tline));
    else tline[0] = '\n';
@@ -3358,11 +3376,7 @@ static int config_cvt (WIN_t *q) {
     #undef old_Show_THREAD
    };
    static const char fields_src[] = CVT_FIELDS;
-#ifdef OOMEM_ENABLE
    char fields_dst[PFLAGSSIZ], *p1, *p2;
-#else
-   char fields_dst[PFLAGSSIZ];
-#endif
    int i, j, x;
 
    // first we'll touch up this window's winflags...
@@ -3381,14 +3395,12 @@ static int config_cvt (WIN_t *q) {
    if (j > CVT_FLDMAX)
       return 1;
    strcpy(fields_dst, fields_src);
-#ifdef OOMEM_ENABLE
    /* all other fields represent the 'on' state with a capitalized version
       of a particular qwerty key.  for the 2 additional suse out-of-memory
       fields it makes perfect sense to do the exact opposite, doesn't it?
       in any case, we must turn them 'off' temporarily... */
    if ((p1 = strchr(q->rc.fieldscur, '[')))  *p1 = '{';
    if ((p2 = strchr(q->rc.fieldscur, '\\'))) *p2 = '|';
-#endif
    for (i = 0; i < j; i++) {
       int c = q->rc.fieldscur[i];
       x = tolower(c) - 'a';
@@ -3398,11 +3410,9 @@ static int config_cvt (WIN_t *q) {
       if (isupper(c))
          FLDon(fields_dst[i]);
    }
-#ifdef OOMEM_ENABLE
    // if we turned any suse only fields off, turn 'em back on OUR way...
    if (p1) FLDon(fields_dst[p1 - q->rc.fieldscur]);
    if (p2) FLDon(fields_dst[p2 - q->rc.fieldscur]);
-#endif
    strcpy(q->rc.fieldscur, fields_dst);
 
    // lastly, we must adjust the old sort field enum...
@@ -5329,6 +5339,9 @@ static const char *task_show (const WIN_t *q, const proc_t *p) {
             }
             break;
 #endif
+         case EU_CGN:
+            makeVAR(p->cgname);
+            break;
          case EU_CGR:
             makeVAR(p->cgroup[0]);
             break;
@@ -5339,7 +5352,7 @@ static const char *task_show (const WIN_t *q, const proc_t *p) {
             cp = scale_mem(S, pages2K(p->trs), W, Jn);
             break;
          case EU_CPN:
-            cp = make_num(p->processor, W, Jn, AUTOX_NO);
+            cp = make_num(p->processor, W, Jn, AUTOX_NO, 0);
             break;
          case EU_CPU:
          {  float u = (float)p->pcpu * Frame_etscale;
@@ -5375,7 +5388,7 @@ static const char *task_show (const WIN_t *q, const proc_t *p) {
             cp = scale_num(p->min_delta, W, Jn);
             break;
          case EU_GID:
-            cp = make_num(p->egid, W, Jn, EU_GID);
+            cp = make_num(p->egid, W, Jn, EU_GID, 0);
             break;
          case EU_GRP:
             cp = make_str(p->egroup, W, Js, EU_GRP);
@@ -5387,7 +5400,7 @@ static const char *task_show (const WIN_t *q, const proc_t *p) {
             cp = scale_pcnt((float)p->vm_rss * 100 / kb_main_total, W, Jn);
             break;
          case EU_NCE:
-            cp = make_num(p->nice, W, Jn, AUTOX_NO);
+            cp = make_num(p->nice, W, Jn, AUTOX_NO, 1);
             break;
          case EU_NS1:  // IPCNS
          case EU_NS2:  // MNTNS
@@ -5396,35 +5409,44 @@ static const char *task_show (const WIN_t *q, const proc_t *p) {
          case EU_NS5:  // USERNS
          case EU_NS6:  // UTSNS
          {  long ino = p->ns[i - EU_NS1];
-            if (Rc.zero_suppress && 0 >= ino) cp = make_str("", W, Js, i);
-            else cp = make_num(ino, W, Jn, i);
+            cp = make_num(ino, W, Jn, i, 1);
          }
             break;
-#ifdef OOMEM_ENABLE
          case EU_OOA:
-            cp = make_num(p->oom_adj, W, Jn, AUTOX_NO);
+            cp = make_num(p->oom_adj, W, Jn, AUTOX_NO, 1);
             break;
          case EU_OOM:
-            cp = make_num(p->oom_score, W, Jn, AUTOX_NO);
+            cp = make_num(p->oom_score, W, Jn, AUTOX_NO, 1);
             break;
-#endif
          case EU_PGD:
-            cp = make_num(p->pgrp, W, Jn, AUTOX_NO);
+            cp = make_num(p->pgrp, W, Jn, AUTOX_NO, 0);
             break;
          case EU_PID:
-            cp = make_num(p->tid, W, Jn, AUTOX_NO);
+            cp = make_num(p->tid, W, Jn, AUTOX_NO, 0);
             break;
          case EU_PPD:
-            cp = make_num(p->ppid, W, Jn, AUTOX_NO);
+            cp = make_num(p->ppid, W, Jn, AUTOX_NO, 0);
             break;
          case EU_PRI:
             if (-99 > p->priority || 999 < p->priority) {
                cp = make_str("rt", W, Jn, AUTOX_NO);
             } else
-               cp = make_num(p->priority, W, Jn, AUTOX_NO);
+               cp = make_num(p->priority, W, Jn, AUTOX_NO, 0);
             break;
          case EU_RES:
             cp = scale_mem(S, p->vm_rss, W, Jn);
+            break;
+         case EU_RZA:
+            cp = scale_mem(S, p->vm_rss_anon, W, Jn);
+            break;
+         case EU_RZF:
+            cp = scale_mem(S, p->vm_rss_file, W, Jn);
+            break;
+         case EU_RZL:
+            cp = scale_mem(S, p->vm_lock, W, Jn);
+            break;
+         case EU_RZS:
+            cp = scale_mem(S, p->vm_rss_shared, W, Jn);
             break;
          case EU_SGD:
             makeVAR(p->supgid);
@@ -5436,7 +5458,7 @@ static const char *task_show (const WIN_t *q, const proc_t *p) {
             cp = scale_mem(S, pages2K(p->share), W, Jn);
             break;
          case EU_SID:
-            cp = make_num(p->session, W, Jn, AUTOX_NO);
+            cp = make_num(p->session, W, Jn, AUTOX_NO, 0);
             break;
          case EU_STA:
             cp = make_chr(p->state, W, Js);
@@ -5445,10 +5467,10 @@ static const char *task_show (const WIN_t *q, const proc_t *p) {
             cp = scale_mem(S, p->vm_swap, W, Jn);
             break;
          case EU_TGD:
-            cp = make_num(p->tgid, W, Jn, AUTOX_NO);
+            cp = make_num(p->tgid, W, Jn, AUTOX_NO, 0);
             break;
          case EU_THD:
-            cp = make_num(p->nlwp, W, Jn, AUTOX_NO);
+            cp = make_num(p->nlwp, W, Jn, AUTOX_NO, 0);
             break;
          case EU_TM2:
          case EU_TME:
@@ -5458,7 +5480,7 @@ static const char *task_show (const WIN_t *q, const proc_t *p) {
          }
             break;
          case EU_TPG:
-            cp = make_num(p->tpgid, W, Jn, AUTOX_NO);
+            cp = make_num(p->tpgid, W, Jn, AUTOX_NO, 0);
             break;
          case EU_TTY:
          {  char tmp[SMLBUFSIZ];
@@ -5467,19 +5489,19 @@ static const char *task_show (const WIN_t *q, const proc_t *p) {
          }
             break;
          case EU_UED:
-            cp = make_num(p->euid, W, Jn, EU_UED);
+            cp = make_num(p->euid, W, Jn, EU_UED, 0);
             break;
          case EU_UEN:
             cp = make_str(p->euser, W, Js, EU_UEN);
             break;
          case EU_URD:
-            cp = make_num(p->ruid, W, Jn, EU_URD);
+            cp = make_num(p->ruid, W, Jn, EU_URD, 0);
             break;
          case EU_URN:
             cp = make_str(p->ruser, W, Js, EU_URN);
             break;
          case EU_USD:
-            cp = make_num(p->suid, W, Jn, EU_USD);
+            cp = make_num(p->suid, W, Jn, EU_USD, 0);
             break;
          case EU_USE:
             cp = scale_mem(S, (p->vm_swap + p->vm_rss), W, Jn);

@@ -26,7 +26,6 @@
 //#define BOOST_PERCNT            /* enable extra precision for two % fields */
 //#define NOBOOST_MEMS            /* disable extra precision for mem fields  */
 //#define NUMA_DISABLE            /* disable summary area NUMA/Nodes display */
-//#define OOMEM_ENABLE            /* enable the SuSE out-of-memory additions */
 //#define ORIG_TOPDEFS            /* with no rcfile retain original defaults */
 //#define SIGNALS_LESS            /* favor reduced signal load over response */
 
@@ -198,14 +197,14 @@ enum pflag {
    EU_FL1, EU_FL2, EU_DRT,
    EU_STA, EU_CMD, EU_WCH, EU_FLG, EU_CGR,
    EU_SGD, EU_SGN, EU_TGD,
-#ifdef OOMEM_ENABLE
    EU_OOA, EU_OOM,
-#endif
    EU_ENV,
    EU_FV1, EU_FV2,
    EU_USE,
    EU_NS1, EU_NS2, EU_NS3, EU_NS4, EU_NS5, EU_NS6,
    EU_LXC,
+   EU_RZA, EU_RZF, EU_RZL, EU_RZS,
+   EU_CGN,
 #ifdef USE_X_COLHDR
    // not really pflags, used with tbl indexing
    EU_MAXPFLGS
@@ -607,16 +606,11 @@ typedef struct WIN_t {
 #define JOB_FIELDS  "¥¦¹·º(³´Ä»½@<§Å)*+,-./012568>?ABCFGHIJKLMNOPQRSTUVWXYZ[" RCF_PLUS_H
 #define MEM_FIELDS  "¥º»<½¾¿ÀÁMBNÃD34·Å&'()*+,-./0125689FGHIJKLOPQRSTUVWXYZ[" RCF_PLUS_H
 #define USR_FIELDS  "¥¦§¨ª°¹·ºÄÅ)+,-./1234568;<=>?@ABCFGHIJKLMNOPQRSTUVWXYZ[" RCF_PLUS_H
-#ifdef OOMEM_ENABLE
-        // the suse old top fields ( 'a'-'z' + '{|' ) in positions 0-27
-        // ( the extra chars above represent the 'off' state )
+        // old top fields ( 'a'-'z' ) in positions 0-25
+        // other suse old top fields ( '{|' ) in positions 26-27
 #define CVT_FIELDS  "%&*'(-0346789:;<=>?@ACDEFGML)+,./125BHIJKNOPQRSTUVWXYZ["
 #define CVT_FLDMAX  28
-#else
-        // other old top fields ( 'a'-'z' ) in positions 0-25
-#define CVT_FIELDS  "%&*'(-0346789:;<=>?@ACDEFG)+,./125BHIJKLMNOPQRSTUVWXYZ["
-#define CVT_FLDMAX  26
-#endif
+
 
         /* The default values for the local config file */
 #define DEF_RCFILE { \
@@ -713,7 +707,7 @@ typedef struct WIN_t {
 /*------  Basic Formatting support  --------------------------------------*/
 //atic inline const char *justify_pad (const char *str, int width, int justr);
 //atic inline const char *make_chr (const char ch, int width, int justr);
-//atic inline const char *make_num (long num, int width, int justr, int col);
+//atic inline const char *make_num (long num, int width, int justr, int col, int noz);
 //atic inline const char *make_str (const char *str, int width, int justr, int col);
 //atic const char   *scale_mem (int target, unsigned long num, int width, int justr);
 //atic const char   *scale_num (unsigned long num, int width, int justr);

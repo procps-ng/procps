@@ -201,7 +201,7 @@ static void discover_shm_minor(void)
 		perror(_("shared memory detach"));
 
 out_destroy:
-	if (shmctl(shmid, IPC_RMID, NULL))
+	if (shmctl(shmid, IPC_RMID, NULL) && errno != EINVAL)
 		perror(_("shared memory remove"));
 
 	return;
@@ -629,9 +629,9 @@ static int one_proc(proc_t * p)
 					diff = 0;
 					continue;
 				}
-				/* Other keys */
-				continue;
 			}
+			/* Other keys or not a key-value pair */
+			continue;
 		}
 		sscanf(mapbuf, "%" KLF "x-%" KLF "x %31s %llx %x:%x %llu", &start,
 		       &end, perms, &file_offset, &dev_major, &dev_minor,
