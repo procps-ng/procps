@@ -441,6 +441,7 @@ static void getrunners(unsigned int *restrict running, unsigned int *restrict bl
 /***********************************************************************/
 
 void getstat(jiff *restrict cuse, jiff *restrict cice, jiff *restrict csys, jiff *restrict cide, jiff *restrict ciow, jiff *restrict cxxx, jiff *restrict cyyy, jiff *restrict czzz,
+	     jiff *restrict cguest, jiff *restrict cniced_guest,
 	     unsigned long *restrict pin, unsigned long *restrict pout, unsigned long *restrict s_in, unsigned long *restrict sout,
 	     unsigned *restrict intr, unsigned *restrict ctxt,
 	     unsigned int *restrict running, unsigned int *restrict blocked,
@@ -464,9 +465,11 @@ void getstat(jiff *restrict cuse, jiff *restrict cice, jiff *restrict csys, jiff
   *cxxx = 0;  /* not separated out until the 2.6.0-test4 kernel */
   *cyyy = 0;  /* not separated out until the 2.6.0-test4 kernel */
   *czzz = 0;  /* not separated out until the 2.6.11 kernel */
+  *cguest = *cniced_guest = 0;  /* not separated out until 2.6.32  */
 
   b = strstr(buff, "cpu ");
-  if(b) sscanf(b,  "cpu  %llu %llu %llu %llu %llu %llu %llu %llu", cuse, cice, csys, cide, ciow, cxxx, cyyy, czzz);
+  if(b) sscanf(b,  "cpu  %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu", cuse, cice, csys, cide, ciow, cxxx,
+	       cyyy, czzz, cguest, cniced_guest);
 
   b = strstr(buff, "page ");
   if(b) sscanf(b,  "page %lu %lu", pin, pout);
