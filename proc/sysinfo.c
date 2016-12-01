@@ -60,6 +60,8 @@ static int meminfo_fd = -1;
 static int vminfo_fd = -1;
 #define VM_MIN_FREE_FILE "/proc/sys/vm/min_free_kbytes"
 static int vm_min_free_fd = -1;
+#define ARCSTATS_FILE "/proc/spl/kstat/zfs/arcstats"
+static int arcstats_fd = -1;
 
 // As of 2.6.24 /proc/meminfo seems to need 888 on 64-bit,
 // and would need 1258 if the obsolete fields were there.
@@ -973,6 +975,246 @@ nextline:
                 + vm_pgscan_kswapd_dma + vm_pgscan_kswapd_high + vm_pgscan_kswapd_normal;
   if(!vm_pgsteal)
     vm_pgsteal  = vm_pgsteal_dma + vm_pgsteal_high + vm_pgsteal_normal;
+}
+
+typedef struct arc_table_struct {
+  const char *name;     /* ARC statistic name */
+  unsigned long *slot;       /* slot in return struct */
+} arc_table_struct;
+
+static int compare_arc_table_structs(const void *a, const void *b){
+  return strcmp(((const arc_table_struct*)a)->name,((const arc_table_struct*)b)->name);
+}
+
+/* ZFS ARC globals */
+unsigned long arc_anon_evictable_data;
+unsigned long arc_anon_evictable_metadata;
+unsigned long arc_anon_size;
+unsigned long arc_arc_loaned_bytes;
+unsigned long arc_arc_meta_limit;
+unsigned long arc_arc_meta_max;
+unsigned long arc_arc_meta_min;
+unsigned long arc_arc_meta_used;
+unsigned long arc_arc_need_free;
+unsigned long arc_arc_no_grow;
+unsigned long arc_arc_prune;
+unsigned long arc_arc_sys_free;
+unsigned long arc_arc_tempreserve;
+unsigned long arc_c;
+unsigned long arc_c_max;
+unsigned long arc_c_min;
+unsigned long arc_data_size;
+unsigned long arc_deleted;
+unsigned long arc_demand_data_hits;
+unsigned long arc_demand_data_misses;
+unsigned long arc_demand_metadata_hits;
+unsigned long arc_demand_metadata_misses;
+unsigned long arc_duplicate_buffers;
+unsigned long arc_duplicate_buffers_size;
+unsigned long arc_duplicate_reads;
+unsigned long arc_evict_l2_cached;
+unsigned long arc_evict_l2_eligible;
+unsigned long arc_evict_l2_ineligible;
+unsigned long arc_evict_l2_skip;
+unsigned long arc_evict_not_enough;
+unsigned long arc_evict_skip;
+unsigned long arc_hash_chain_max;
+unsigned long arc_hash_chains;
+unsigned long arc_hash_collisions;
+unsigned long arc_hash_elements;
+unsigned long arc_hash_elements_max;
+unsigned long arc_hdr_size;
+unsigned long arc_hits;
+unsigned long arc_l2_abort_lowmem;
+unsigned long arc_l2_asize;
+unsigned long arc_l2_cdata_free_on_write;
+unsigned long arc_l2_cksum_bad;
+unsigned long arc_l2_compress_failures;
+unsigned long arc_l2_compress_successes;
+unsigned long arc_l2_compress_zeros;
+unsigned long arc_l2_evict_l1cached;
+unsigned long arc_l2_evict_lock_retry;
+unsigned long arc_l2_evict_reading;
+unsigned long arc_l2_feeds;
+unsigned long arc_l2_free_on_write;
+unsigned long arc_l2_hdr_size;
+unsigned long arc_l2_hits;
+unsigned long arc_l2_io_error;
+unsigned long arc_l2_misses;
+unsigned long arc_l2_read_bytes;
+unsigned long arc_l2_rw_clash;
+unsigned long arc_l2_size;
+unsigned long arc_l2_write_bytes;
+unsigned long arc_l2_writes_done;
+unsigned long arc_l2_writes_error;
+unsigned long arc_l2_writes_lock_retry;
+unsigned long arc_l2_writes_sent;
+unsigned long arc_memory_direct_count;
+unsigned long arc_memory_indirect_count;
+unsigned long arc_memory_throttle_count;
+unsigned long arc_metadata_size;
+unsigned long arc_mfu_evictable_data;
+unsigned long arc_mfu_evictable_metadata;
+unsigned long arc_mfu_ghost_evictable_data;
+unsigned long arc_mfu_ghost_evictable_metadata;
+unsigned long arc_mfu_ghost_hits;
+unsigned long arc_mfu_ghost_size;
+unsigned long arc_mfu_hits;
+unsigned long arc_mfu_size;
+unsigned long arc_misses;
+unsigned long arc_mru_evictable_data;
+unsigned long arc_mru_evictable_metadata;
+unsigned long arc_mru_ghost_evictable_data;
+unsigned long arc_mru_ghost_evictable_metadata;
+unsigned long arc_mru_ghost_hits;
+unsigned long arc_mru_ghost_size;
+unsigned long arc_mru_hits;
+unsigned long arc_mru_size;
+unsigned long arc_mutex_miss;
+unsigned long arc_other_size;
+unsigned long arc_p;
+unsigned long arc_prefetch_data_hits;
+unsigned long arc_prefetch_data_misses;
+unsigned long arc_prefetch_metadata_hits;
+unsigned long arc_prefetch_metadata_misses;
+unsigned long arc_size;
+
+void arcstats(void){
+  char namebuf[64]; /* big enough to hold any row name */
+  arc_table_struct findme = { namebuf, NULL};
+  arc_table_struct *found;
+  char *head;
+  char *tail;
+
+  static const arc_table_struct arc_table[] = {
+    {"anon_evictable_data", &arc_anon_evictable_data},
+    {"anon_evictable_metadata", &arc_anon_evictable_metadata},
+    {"anon_size", &arc_anon_size},
+    {"arc_loaned_bytes", &arc_arc_loaned_bytes},
+    {"arc_meta_limit", &arc_arc_meta_limit},
+    {"arc_meta_max", &arc_arc_meta_max},
+    {"arc_meta_min", &arc_arc_meta_min},
+    {"arc_meta_used", &arc_arc_meta_used},
+    {"arc_need_free", &arc_arc_need_free},
+    {"arc_no_grow", &arc_arc_no_grow},
+    {"arc_prune", &arc_arc_prune},
+    {"arc_sys_free", &arc_arc_sys_free},
+    {"arc_tempreserve", &arc_arc_tempreserve},
+    {"c", &arc_c},
+    {"c_max", &arc_c_max},
+    {"c_min", &arc_c_min},
+    {"data_size", &arc_data_size},
+    {"deleted", &arc_deleted},
+    {"demand_data_hits", &arc_demand_data_hits},
+    {"demand_data_misses", &arc_demand_data_misses},
+    {"demand_metadata_hits", &arc_demand_metadata_hits},
+    {"demand_metadata_misses", &arc_demand_metadata_misses},
+    {"duplicate_buffers", &arc_duplicate_buffers},
+    {"duplicate_buffers_size", &arc_duplicate_buffers_size},
+    {"duplicate_reads", &arc_duplicate_reads},
+    {"evict_l2_cached", &arc_evict_l2_cached},
+    {"evict_l2_eligible", &arc_evict_l2_eligible},
+    {"evict_l2_ineligible", &arc_evict_l2_ineligible},
+    {"evict_l2_skip", &arc_evict_l2_skip},
+    {"evict_not_enough", &arc_evict_not_enough},
+    {"evict_skip", &arc_evict_skip},
+    {"hash_chain_max", &arc_hash_chain_max},
+    {"hash_chains", &arc_hash_chains},
+    {"hash_collisions", &arc_hash_collisions},
+    {"hash_elements", &arc_hash_elements},
+    {"hash_elements_max", &arc_hash_elements_max},
+    {"hdr_size", &arc_hdr_size},
+    {"hits", &arc_hits},
+    {"l2_abort_lowmem", &arc_l2_abort_lowmem},
+    {"l2_asize", &arc_l2_asize},
+    {"l2_cdata_free_on_write", &arc_l2_cdata_free_on_write},
+    {"l2_cksum_bad", &arc_l2_cksum_bad},
+    {"l2_compress_failures", &arc_l2_compress_failures},
+    {"l2_compress_successes", &arc_l2_compress_successes},
+    {"l2_compress_zeros", &arc_l2_compress_zeros},
+    {"l2_evict_l1cached", &arc_l2_evict_l1cached},
+    {"l2_evict_lock_retry", &arc_l2_evict_lock_retry},
+    {"l2_evict_reading", &arc_l2_evict_reading},
+    {"l2_feeds", &arc_l2_feeds},
+    {"l2_free_on_write", &arc_l2_free_on_write},
+    {"l2_hdr_size", &arc_l2_hdr_size},
+    {"l2_hits", &arc_l2_hits},
+    {"l2_io_error", &arc_l2_io_error},
+    {"l2_misses", &arc_l2_misses},
+    {"l2_read_bytes", &arc_l2_read_bytes},
+    {"l2_rw_clash", &arc_l2_rw_clash},
+    {"l2_size", &arc_l2_size},
+    {"l2_write_bytes", &arc_l2_write_bytes},
+    {"l2_writes_done", &arc_l2_writes_done},
+    {"l2_writes_error", &arc_l2_writes_error},
+    {"l2_writes_lock_retry", &arc_l2_writes_lock_retry},
+    {"l2_writes_sent", &arc_l2_writes_sent},
+    {"memory_direct_count", &arc_memory_direct_count},
+    {"memory_indirect_count", &arc_memory_indirect_count},
+    {"memory_throttle_count", &arc_memory_throttle_count},
+    {"metadata_size", &arc_metadata_size},
+    {"mfu_evictable_data", &arc_mfu_evictable_data},
+    {"mfu_evictable_metadata", &arc_mfu_evictable_metadata},
+    {"mfu_ghost_evictable_data", &arc_mfu_ghost_evictable_data},
+    {"mfu_ghost_evictable_metadata", &arc_mfu_ghost_evictable_metadata},
+    {"mfu_ghost_hits", &arc_mfu_ghost_hits},
+    {"mfu_ghost_size", &arc_mfu_ghost_size},
+    {"mfu_hits", &arc_mfu_hits},
+    {"mfu_size", &arc_mfu_size},
+    {"misses", &arc_misses},
+    {"mru_evictable_data", &arc_mru_evictable_data},
+    {"mru_evictable_metadata", &arc_mru_evictable_metadata},
+    {"mru_ghost_evictable_data", &arc_mru_ghost_evictable_data},
+    {"mru_ghost_evictable_metadata", &arc_mru_ghost_evictable_metadata},
+    {"mru_ghost_hits", &arc_mru_ghost_hits},
+    {"mru_ghost_size", &arc_mru_ghost_size},
+    {"mru_hits", &arc_mru_hits},
+    {"mru_size", &arc_mru_size},
+    {"mutex_miss", &arc_mutex_miss},
+    {"other_size", &arc_other_size},
+    {"p", &arc_p},
+    {"prefetch_data_hits", &arc_prefetch_data_hits},
+    {"prefetch_data_misses", &arc_prefetch_data_misses},
+    {"prefetch_metadata_hits", &arc_prefetch_metadata_hits},
+    {"prefetch_metadata_misses", &arc_prefetch_metadata_misses},
+    {"size", &arc_size}
+  };
+  const int arc_table_count = sizeof(arc_table)/sizeof(arc_table_struct);
+  //signed long arc_available, arc_used;
+
+  FILE_TO_BUF(ARCSTATS_FILE,arcstats_fd);
+  head = buf;
+  /* Skip first two lines because file format is weird. */
+  tail = strchr(head, '\n');
+  head = tail+1;
+  tail = strchr(head, '\n');
+  head = tail+1;
+  for(;;){
+    tail = strchr(head, '4');
+    if(!tail) break;
+    *tail = '\0';
+    if(strlen(head) >= sizeof(namebuf)){
+      head = tail+1;
+      goto nextline;
+    }
+    strcpy(namebuf,head);
+    *(strchr(namebuf, ' ')) = '\0';
+    //fprintf(stderr, "SEARCHING: %s\n", findme.name);
+    found = bsearch(&findme, arc_table, arc_table_count,
+        sizeof(arc_table_struct), compare_arc_table_structs
+    );
+    head = tail+5;
+    if(!found) {
+        //fprintf(stderr, "NOT FOUND\n");
+        goto nextline;
+    }
+    *(found->slot) = (unsigned long)strtoull(head,&tail,10);
+    //fprintf(stderr, "%s = %lu\n", found->name, *(found->slot));
+nextline:
+    tail = strchr(head, '\n');
+    if(!tail) break;
+    head = tail+1;
+  }
 }
 
 ///////////////////////////////////////////////////////////////////////

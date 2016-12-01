@@ -1,6 +1,13 @@
 LIBPROCPS_0 {
 global:
 	Hertz;
+	arcstats;
+	arc_size;
+	arc_mfu_size;
+	arc_mru_size;
+	arc_anon_size;
+	arc_hdr_size;
+	arc_other_size;
 	closeproc;
 	cpuinfo;
 	dev_to_tty;

@@ -2728,6 +2728,9 @@ static void sysinfo_refresh (int forced) {
          Numa_node_tot = Numa_max_node() + 1;
 #endif
 #endif
+//#ifdef ZFS_ARC
+      arcstats();
+//#endif
       sav_secs = cur_secs;
    }
 } // end: sysinfo_refresh
@@ -5232,7 +5235,9 @@ numa_nope:
     #define scT(e)  scaletab[Rc.summ_mscale]. e
     #define mkM(x) (float)kb_main_ ## x / scT(div)
     #define mkS(x) (float)kb_swap_ ## x / scT(div)
+    #define mkA(x) (float)x / scT(div)
     #define prT(b,z) { if (9 < snprintf(b, 10, scT(fmts), z)) b[8] = '+'; }
+    #define toKB(x) (float)x / 1024.0
       static struct {
          float div;
          const char *fmts;
@@ -5249,7 +5254,7 @@ numa_nope:
       // snprintf contents of each buf (after SK_Kb):       'nnnn.nnn 0'
       // and prT macro might replace space at buf[8] with:   ------> +
          char buf[10]; // MEMORY_lines_fmt provides for 8+1 bytes
-      } buftab[8];
+      } buftab[14];
 
       if (!scaletab[0].label) {
          scaletab[0].label = N_txt(AMT_kilobyte_txt);
@@ -5289,6 +5294,7 @@ numa_nope:
          snprintf(dual, sizeof(dual), "%s%s", used, util);
          snprintf(util, sizeof(util), gtab[ix].swap, (int)((pct_swap * Graph_adj) + .5), gtab[ix].type);
          prT(bfT(0), mkM(total)); prT(bfT(1), mkS(total));
+         /* TODO: Add ARC graphs*/
          show_special(0, fmtmk( "%s %s:~3%#5.1f~2/%-9.9s~3[~1%-*s]~1\n%s %s:~3%#5.1f~2/%-9.9s~3[~1%-*s]~1\n"
             , scT(label), N_txt(WORD_abv_mem_txt), pct_used + pct_misc, bfT(0), Graph_len +4, dual
             , scT(label), N_txt(WORD_abv_swp_txt), pct_swap, bfT(1), Graph_len +2, util));
@@ -5298,13 +5304,16 @@ numa_nope:
          prT(bfT(2), mkM(used));  prT(bfT(3), mkM(my_misc));
          prT(bfT(4), mkS(total)); prT(bfT(5), mkS(free));
          prT(bfT(6), mkS(used));  prT(bfT(7), mkM(available));
+	 prT(bfT(8), mkA(toKB(arc_size))); prT(bfT(9), mkA(toKB(arc_mfu_size)));
+	 prT(bfT(10), mkA(toKB(arc_mru_size))); prT(bfT(11), mkA(toKB(arc_anon_size)));
+	 prT(bfT(12), mkA(toKB(arc_hdr_size))); prT(bfT(13), mkA(toKB(arc_other_size)));
          show_special(0, fmtmk(N_unq(MEMORY_lines_fmt)
             , scT(label), N_txt(WORD_abv_mem_txt), bfT(0), bfT(1), bfT(2), bfT(3)
-            , scT(label), N_txt(WORD_abv_arc_txt), bfT(0), bfT(1), bfT(2), bfT(3), bfT(3), bfT(3)
+            , scT(label), N_txt(WORD_abv_arc_txt), bfT(8), bfT(9), bfT(10), bfT(11), bfT(12), bfT(13)
             , scT(label), N_txt(WORD_abv_swp_txt), bfT(4), bfT(5), bfT(6), bfT(7)
             , N_txt(WORD_abv_mem_txt)));
-      }
-      Msg_row += 3;
+    }
+    Msg_row += 3;
     #undef bfT
     #undef scT
     #undef mkM
