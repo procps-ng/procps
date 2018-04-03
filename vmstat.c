@@ -182,13 +182,53 @@ static int format_1000(unsigned long long val64, char *restrict dst)
 }
 #endif
 
+/*
+ * "fields": a table of output column headers and widths.
+ *
+ * If you change these, you will also need to adjust the strings
+ * for the first line of the header/wide_header in new_header().
+ *
+ * The header strings need to be translated when used.
+ *
+ * Translation Hint: the maximum width of field "header" is the
+ * value of field "width",
+ */
+struct field {
+	char *header;
+	int width;
+	int wide_width;		/* If -w option is given */
+	unsigned long value;	/* Set by program code, not initialized */
+};
+
+static struct field fields[] = {
+	{ "r",		2,  2	},	/* fields[0] */
+	{ "b",		2,  2	},
+	{ "swpd",	6, 12	},
+	{ "free",	6, 12	},
+	{ "buff",	6, 12	},	/* modified to "inact" if a_option */
+	{ "cache",	6, 12	},	/* modified to "active" if a_option */
+	{ "si",		4,  4	},
+	{ "so",		4,  4	},
+	{ "bi",		5,  5	},
+	{ "bo",		5,  5	},
+	{ "in",		4,  4	},
+	{ "cs",		4,  4	},
+	{ "us",		2,  3	},
+	{ "sy",		2,  3	},
+	{ "id",		2,  3	},
+	{ "wa",		2,  3	},
+	{ "st",		2,  3	},	/* fields[16] */
+	{ NULL,		0,  0	}	/* Sentinel */
+};
+
 static void new_header(void)
 {
 	struct tm *tm_ptr;
 	time_t the_time;
 	char timebuf[32];
+	struct field *field;
 
-	/* Translation Hint: Translating folloging header & fields
+	/* Translation Hint: Translating following header & fields
 	 * that follow (marked with max x chars) might not work,
 	 * unless manual page is translated as well.  */
 	const char *header =
@@ -196,12 +236,6 @@ static void new_header(void)
 	const char *wide_header =
 	    _("procs -----------------------memory---------------------- ---swap-- -----io---- -system-- --------cpu--------");
 	const char *timestamp_header = _(" -----timestamp-----");
-
-	const char format[] =
-	    "%2s %2s %6s %6s %6s %6s %4s %4s %5s %5s %4s %4s %2s %2s %2s %2s %2s";
-	const char wide_format[] =
-	    "%2s %2s %12s %12s %12s %12s %4s %4s %5s %5s %4s %4s %3s %3s %3s %3s %3s";
-
 
 	printf("%s", w_option ? wide_header : header);
 
@@ -211,46 +245,21 @@ static void new_header(void)
 
 	printf("\n");
 
-	printf(
-	    w_option ? wide_format : format,
-	    /* Translation Hint: max 2 chars */
-	     _("r"),
-	    /* Translation Hint: max 2 chars */
-	     _("b"),
-	    /* Translation Hint: max 6 chars */
-	     _("swpd"),
-	    /* Translation Hint: max 6 chars */
-	     _("free"),
-	    /* Translation Hint: max 6 chars */
-	     a_option ? _("inact") :
-	    /* Translation Hint: max 6 chars */
-			_("buff"),
-	    /* Translation Hint: max 6 chars */
-	     a_option ? _("active") :
-	    /* Translation Hint: max 6 chars */
-			_("cache"),
-	    /* Translation Hint: max 4 chars */
-	     _("si"),
-	    /* Translation Hint: max 4 chars */
-	     _("so"),
-	    /* Translation Hint: max 5 chars */
-	     _("bi"),
-	    /* Translation Hint: max 5 chars */
-	     _("bo"),
-	    /* Translation Hint: max 4 chars */
-	     _("in"),
-	    /* Translation Hint: max 4 chars */
-	     _("cs"),
-	    /* Translation Hint: max 2 chars */
-	     _("us"),
-	    /* Translation Hint: max 2 chars */
-	     _("sy"),
-	    /* Translation Hint: max 2 chars */
-	     _("id"),
-	    /* Translation Hint: max 2 chars */
-	     _("wa"),
-	    /* Translation Hint: max 2 chars */
-	     _("st"));
+	if (a_option) {
+		/* Translation Hint: max 6 chars each */
+		fields[4].header = "inact";
+		fields[5].header = "active";
+	}
+
+	/* Print the field headers */
+	for (field=fields; field->header != NULL; field++) {
+		printf("%*s", !w_option ? field->width : field->wide_width,
+			      _(field->header));
+
+		if (field[1].header != NULL) {
+			printf(" ");
+		}
+	}
 
 	if (t_option) {
 		(void) time( &the_time );
@@ -273,13 +282,59 @@ static unsigned long unitConvert(unsigned long size)
 	return ((unsigned long)cvSize);
 }
 
+/*
+ * Print a line of VMSTAT output.
+ */
+static void output_line(
+	unsigned r, unsigned b,
+	unsigned long used, unsigned long free,
+	unsigned long buff, unsigned long cache,
+	unsigned si, unsigned so,
+	unsigned bi, unsigned bo,
+	unsigned in, unsigned cs,
+	unsigned us, unsigned sy, unsigned id, unsigned wa, unsigned st,
+	char timebuf[])
+{
+	struct field *field;
+
+	field = fields;
+	field++->value = r;
+	field++->value = b;
+	field++->value = used;
+	field++->value = free;
+	field++->value = buff;
+	field++->value = cache;
+	field++->value = si;
+	field++->value = so;
+	field++->value = bi;
+	field++->value = bo;
+	field++->value = in;
+	field++->value = cs;
+	field++->value = us;
+	field++->value = sy;
+	field++->value = id;
+	field++->value = wa;
+	field++->value = st;
+
+	for (field=fields; field->header != NULL; field++) {
+		printf("%*lu", !w_option ? field->width
+					 : field->wide_width,
+			       field->value);
+		/* Print a space after all but the last field */
+		if (field[1].header != NULL) {
+			printf(" ");
+		}
+	}
+
+	if (t_option) {
+		printf(" %s", timebuf);
+	}
+
+	printf("\n");
+}
+
 static void new_format(void)
 {
-	const char format[] =
-	    "%2u %2u %6lu %6lu %6lu %6lu %4u %4u %5u %5u %4u %4u %2u %2u %2u %2u %2u";
-	const char wide_format[] =
-	    "%2u %2u %12lu %12lu %12lu %12lu %4u %4u %5u %5u %4u %4u %3u %3u %3u %3u %3u";
-
 	unsigned int tog = 0;	/* toggle switch for cleaner code */
 	unsigned int i;
 	unsigned int hz = Hertz;
@@ -318,7 +373,9 @@ static void new_format(void)
 	Div = duse + dsys + didl + diow + dstl;
 	if (!Div) Div = 1, didl = 1;
 	divo2 = Div / 2UL;
-	printf(w_option ? wide_format : format,
+
+	/* Print average values since boot time. */
+	output_line(
 	       running, blocked,
 	       unitConvert(kb_swap_used), unitConvert(kb_main_free),
 	       unitConvert(a_option?kb_inactive:kb_main_buffers),
@@ -333,14 +390,9 @@ static void new_format(void)
 	       (unsigned)( (100*dsys			+ divo2) / Div ),
 	       (unsigned)( (100*didl			+ divo2) / Div ),
 	       (unsigned)( (100*diow			+ divo2) / Div ),
-	       (unsigned)( (100*dstl			+ divo2) / Div )
+	       (unsigned)( (100*dstl			+ divo2) / Div ),
+	       timebuf
 	);
-
-	if (t_option) {
-		printf(" %s", timebuf);
-	}
-
-	printf("\n");
 
 	/* main loop */
 	for (i = 1; infinite_updates || i < num_updates; i++) {
@@ -385,7 +437,8 @@ static void new_format(void)
 		Div = duse + dsys + didl + diow + dstl;
 		if (!Div) Div = 1, didl = 1;
 		divo2 = Div / 2UL;
-		printf(w_option ? wide_format : format,
+
+		output_line(
 		       running,
 		       blocked,
 		       unitConvert(kb_swap_used),unitConvert(kb_main_free),
@@ -412,14 +465,9 @@ static void new_format(void)
 		       /* wa */
 		       (unsigned)( (100*diow+divo2)/Div ),
 		       /* st */
-		       (unsigned)( (100*dstl+divo2)/Div )
+		       (unsigned)( (100*dstl+divo2)/Div ),
+		       timebuf
 		);
-
-		if (t_option) {
-			printf(" %s", timebuf);
-		}
-
-		printf("\n");
 	}
 }
 
