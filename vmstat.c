@@ -284,6 +284,11 @@ static unsigned long unitConvert(unsigned long size)
 
 /*
  * Print a line of VMSTAT output.
+ *
+ * We compensate for numbers that overflow their allotted column widths by
+ * remembering how many character positions we are too far to the right
+ * and omitting leading spaces before any following columns that do not
+ * fill their width completely.
  */
 static void output_line(
 	unsigned r, unsigned b,
@@ -296,6 +301,7 @@ static void output_line(
 	char timebuf[])
 {
 	struct field *field;
+	int skew = 0;	/* How many character columns too far right are we? */
 
 	field = fields;
 	field++->value = r;
@@ -317,9 +323,32 @@ static void output_line(
 	field++->value = st;
 
 	for (field=fields; field->header != NULL; field++) {
-		printf("%*lu", !w_option ? field->width
-					 : field->wide_width,
-			       field->value);
+		unsigned long v;	/* temporary */
+		unsigned digits;	/* How many digits does it print as? */
+		unsigned width;		/* Declared width of this column */
+
+		/* Calculate how many digits will print. We could sprintf into
+		 * a string buffer and measure it, but this seems more reliable
+		 * than guessing the max number of chars that an unsigned long
+		 * could print as.
+		 */
+		for (v = field->value, digits = 1;
+		     v > 9;
+		     v /= 10, digits++)
+			;
+
+		width = !w_option ? field->width : field->wide_width;
+
+		/* Compensate for previous column-width overflows if possible */
+		while (skew > 0 && digits < width) {
+			width--; skew--;
+		}
+
+		printf("%*lu", width, field->value);
+
+		/* If it overflowed its column width, remember by how much */
+		if (digits > width) skew += digits - width;
+
 		/* Print a space after all but the last field */
 		if (field[1].header != NULL) {
 			printf(" ");
