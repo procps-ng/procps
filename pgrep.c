@@ -53,6 +53,7 @@
 #include "fileutils.h"
 #include "nsutils.h"
 #include "nls.h"
+#include "strutils.h"
 #include "xalloc.h"
 #include "proc/readproc.h"
 #include "proc/sig.h"
@@ -639,19 +640,16 @@ static struct el * select_procs (int *num)
 
 		if (opt_long || opt_longlong || (match && opt_pattern)) {
 			if (opt_longlong && task.cmdline)
-				strncpy (cmdoutput, cmdline, cmdlen - 1);
+				stzncpy (cmdoutput, cmdline, cmdlen - 1);
 			else
-				strncpy (cmdoutput, task.cmd, cmdlen - 1);
-			cmdoutput[cmdlen - 1] = '\0';
+				stzncpy (cmdoutput, task.cmd, cmdlen - 1);
 		}
-
 
 		if (match && opt_pattern) {
 			if (opt_full && task.cmdline)
-				strncpy (cmdsearch, cmdline, cmdlen - 1);
+				stzncpy (cmdsearch, cmdline, cmdlen - 1);
 			else
-				strncpy (cmdsearch, task.cmd, cmdlen - 1);
-			cmdsearch[cmdlen - 1] = '\0';
+				stzncpy (cmdsearch, task.cmd, cmdlen - 1);
 
 			if (regexec (preg, cmdsearch, 0, NULL, 0) != 0)
 				match = 0;
