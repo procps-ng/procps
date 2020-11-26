@@ -97,6 +97,7 @@ static inline void free_acquired (proc_t *p, int reuse) {
 #ifdef QUICK_THREADS
     if (!IS_THREAD(p)) {
 #endif
+        if (p->dfd >= 0) close(p->dfd);
         if (p->environ)  free((void*)*p->environ);
         if (p->cmdline)  free((void*)*p->cmdline);
         if (p->cgroup)   free((void*)*p->cgroup);
@@ -114,6 +115,7 @@ static inline void free_acquired (proc_t *p, int reuse) {
     }
 #endif
     memset(p, reuse ? '\0' : '\xff', sizeof(*p));
+    p->dfd = -1;
 }
 
 ///////////////////////////////////////////////////////////////////////////
@@ -536,6 +538,13 @@ static void ns2proc(const char *directory, proc_t *restrict p) {
     int i;
 
     for (i = 0; i < NUM_NS; i++) {
+        if (p->dfd >= 0) {
+            snprintf(path, sizeof(path), "ns/%s", ns_names[i]);
+            if (0 == fstatat(p->dfd, path, &sb, 0)) {
+                p->ns[i] = (long)sb.st_ino;
+                continue;
+            }
+        }
         snprintf(path, sizeof(path), "%s/ns/%s", directory, ns_names[i]);
         if (0 == stat(path, &sb))
             p->ns[i] = (long)sb.st_ino;
@@ -662,10 +671,32 @@ static void statm2proc(const char* s, proc_t *restrict P) {
 	   &P->trs, &P->lrs, &P->drs, &P->dt);
 }
 
-static int file2str(const char *directory, const char *what, struct utlbuf_s *ub) {
- #define buffGRW 1024
+static int do_open(const char *directory, int dfd, const char *what) {
     char path[PROCPATHLEN];
-    int fd, num, tot_read = 0, len;
+    int len;
+
+    len = snprintf(path, sizeof path, "%s/%s", directory, what);
+    if (len <= 0 || (size_t)len >= sizeof path) return -1;
+    return open(path, O_RDONLY);
+}
+
+static int openat_or_open(const char *directory, int dfd, const char *what) {
+    int res;
+
+    if (dfd < 0)
+        return do_open(directory, dfd, what);
+
+    res = openat(dfd, what, O_RDONLY);
+    /* Fall back to open() if openat() is not supported */
+    if (res < 0 && errno == ENOSYS)
+        return do_open(directory, dfd, what);
+
+    return res;
+}
+
+static int file2str(const char *directory, int dfd, const char *what, struct utlbuf_s *ub) {
+ #define buffGRW 1024
+    int fd, num, tot_read = 0;
 
     /* on first use we preallocate a buffer of minimum size to emulate
        former 'local static' behavior -- even if this read fails, that
@@ -673,9 +704,7 @@ static int file2str(const char *directory, const char *what, struct utlbuf_s *ub
        ( besides, with this xcalloc we will never need to use memcpy ) */
     if (ub->buf) ub->buf[0] = '\0';
     else ub->buf = xcalloc((ub->siz = buffGRW));
-    len = snprintf(path, sizeof path, "%s/%s", directory, what);
-    if (len <= 0 || (size_t)len >= sizeof path) return -1;
-    if (-1 == (fd = open(path, O_RDONLY, 0))) return -1;
+    if (-1 == (fd = openat_or_open(directory, dfd, what))) return -1;
     while (0 < (num = read(fd, ub->buf + tot_read, ub->siz - tot_read))) {
         tot_read += num;
         if (tot_read < ub->siz) break;
@@ -692,15 +721,13 @@ static int file2str(const char *directory, const char *what, struct utlbuf_s *ub
  #undef buffGRW
 }
 
-static char** file2strvec(const char* directory, const char* what) {
+static char** file2strvec(const char *directory, int dfd, const char* what) {
     char buf[2048];	/* read buf bytes at a time */
     char *p, *rbuf = 0, *endbuf, **q, **ret, *strp;
     int fd, tot = 0, n, c, end_of_file = 0;
     int align;
 
-    const int len = snprintf(buf, sizeof buf, "%s/%s", directory, what);
-    if(len <= 0 || (size_t)len >= sizeof buf) return NULL;
-    fd = open(buf, O_RDONLY, 0);
+    fd = openat_or_open(directory, dfd, what);
     if(fd==-1) return NULL;
 
     /* read whole file into a memory buffer, allocating as we go */
@@ -766,18 +793,15 @@ static char** file2strvec(const char* directory, const char* what) {
     // this is the former under utilized 'read_cmdline', which has been
     // generalized in support of these new libproc flags:
     //     PROC_EDITCGRPCVT, PROC_EDITCMDLCVT and PROC_EDITENVRCVT
-static int read_unvectored(char *restrict const dst, unsigned sz, const char* whom, const char *what, char sep) {
-    char path[PROCPATHLEN];
-    int fd, len;
+static int read_unvectored(char *restrict const dst, unsigned sz, const char *whom, int dfd, const char *what, char sep) {
+    int fd;
     unsigned n = 0;
 
     if(sz <= 0) return 0;
     if(sz >= INT_MAX) sz = INT_MAX-1;
     dst[0] = '\0';
 
-    len = snprintf(path, sizeof(path), "%s/%s", whom, what);
-    if(len <= 0 || (size_t)len >= sizeof(path)) return 0;
-    fd = open(path, O_RDONLY);
+    fd = openat_or_open(whom, dfd, what);
     if(fd==-1) return 0;
 
     for(;;){
@@ -831,7 +855,7 @@ static void fill_cgroup_cvt (const char* directory, proc_t *restrict p) {
     int tot, x, whackable_int = MAX_BUFSZ, len;
 
     *(dst = dst_buffer) = '\0';                  // empty destination
-    tot = read_unvectored(src_buffer, MAX_BUFSZ, directory, "cgroup", '\0');
+    tot = read_unvectored(src_buffer, MAX_BUFSZ, directory, p->dfd, "cgroup", '\0');
     for (src = src_buffer, eob = src_buffer + tot; src < eob; src += x) {
         x = 1;                                   // loop assist
         if (!*src) continue;
@@ -857,11 +881,11 @@ static void fill_cgroup_cvt (const char* directory, proc_t *restrict p) {
     // This routine reads a 'cmdline' for the designated proc_t, "escapes"
     // the result into a single string represented as a single vector
     // and guarantees the caller a valid proc_t.cmdline pointer.
-static void fill_cmdline_cvt (const char* directory, proc_t *restrict p) {
+static void fill_cmdline_cvt(const char* directory, proc_t *restrict p) {
  #define uFLG ( ESC_BRACKETS | ESC_DEFUNCT )
     int whackable_int = MAX_BUFSZ;
 
-    if (read_unvectored(src_buffer, MAX_BUFSZ, directory, "cmdline", ' '))
+    if (read_unvectored(src_buffer, MAX_BUFSZ, directory, p->dfd, "cmdline", ' '))
         escaped_copy(dst_buffer, src_buffer, MAX_BUFSZ, &whackable_int);
     else
         escape_command(dst_buffer, p, MAX_BUFSZ, &whackable_int, uFLG);
@@ -875,7 +899,7 @@ static void fill_environ_cvt (const char* directory, proc_t *restrict p) {
     int whackable_int = MAX_BUFSZ;
 
     dst_buffer[0] = '\0';
-    if (read_unvectored(src_buffer, MAX_BUFSZ, directory, "environ", ' '))
+    if (read_unvectored(src_buffer, MAX_BUFSZ, directory, p->dfd, "environ", ' '))
         escaped_copy(dst_buffer, src_buffer, MAX_BUFSZ, &whackable_int);
     p->environ = vectorize_this_str(dst_buffer[0] ? dst_buffer : "-");
 }
@@ -884,14 +908,14 @@ static void fill_environ_cvt (const char* directory, proc_t *restrict p) {
 int read_cmdline(char *restrict const dst, unsigned sz, unsigned pid) {
     char path[PROCPATHLEN];
     snprintf(path, sizeof(path), "/proc/%u", pid);
-    return read_unvectored(dst, sz, path, "cmdline", ' ');
+    return read_unvectored(dst, sz, path, -1, "cmdline", ' ');
 }
 
 
     // Provide the means to value proc_t.lxcname (perhaps only with "-") while
     // tracking all names already seen thus avoiding the overhead of repeating
     // malloc() and free() calls.
-static const char *lxc_containers (const char *path) {
+static const char *lxc_containers (const char *path, int dfd) {
     static struct utlbuf_s ub = { NULL, 0 };   // util buffer for whole cgroup
     static char lxc_none[] = "-";
     /*
@@ -909,7 +933,7 @@ static const char *lxc_containers (const char *path) {
            2:name=systemd:/
            1:cpuset,cpu,cpuacct,devices,freezer,net_cls,blkio,perf_event,net_prio:/lxc/lxc-P
     */
-    if (file2str(path, "cgroup", &ub) > 0) {
+    if (file2str(path, dfd, "cgroup", &ub) > 0) {
         /* ouch, the next defaults could be changed at lxc ./configure time
            ( and a changed 'lxc.cgroup.pattern' is only available to root ) */
         static const char *lxc_delm1 = "lxc.payload.";    // with lxc-4.0.0
@@ -984,8 +1008,13 @@ static proc_t* simple_readproc(PROCTAB *restrict const PT, proc_t *restrict cons
     char *restrict const path = PT->path;
     unsigned flags = PT->flags;
 
-    if (unlikely(stat(path, &sb) == -1))        /* no such dirent (anymore) */
-        goto next_proc;
+    if (p->dfd >= 0) {
+        if (unlikely(fstat(p->dfd, &sb) == -1)) /* no such dirent (anymore) */
+            goto next_proc;
+    } else {
+        if (unlikely(stat(path, &sb) == -1))
+            goto next_proc;
+    }
 
     if ((flags & PROC_UID) && !XinLN(uid_t, sb.st_uid, PT->uids, PT->nuid))
         goto next_proc;                 /* not one of the requested uids */
@@ -994,18 +1023,18 @@ static proc_t* simple_readproc(PROCTAB *restrict const PT, proc_t *restrict cons
     p->egid = sb.st_gid;                        /* need a way to get real gid */
 
     if (flags & PROC_FILLSTAT) {                // read /proc/#/stat
-        if (unlikely(file2str(path, "stat", &ub) == -1))
+        if (unlikely(file2str(path, p->dfd, "stat", &ub) == -1))
             goto next_proc;
         stat2proc(ub.buf, p);
     }
 
     if (flags & PROC_FILLMEM) {                 // read /proc/#/statm
-        if (likely(file2str(path, "statm", &ub) != -1))
+        if (likely(file2str(path, p->dfd, "statm", &ub) != -1))
             statm2proc(ub.buf, p);
     }
 
     if (flags & PROC_FILLSTATUS) {              // read /proc/#/status
-        if (likely(file2str(path, "status", &ub) != -1)){
+        if (likely(file2str(path, p->dfd, "status", &ub) != -1)){
             status2proc(ub.buf, p, 1);
             if (flags & PROC_FILLSUPGRP)
                 supgrps_from_supgids(p);
@@ -1041,27 +1070,27 @@ static proc_t* simple_readproc(PROCTAB *restrict const PT, proc_t *restrict cons
         if (flags & PROC_EDITENVRCVT)
             fill_environ_cvt(path, p);
         else
-            p->environ = file2strvec(path, "environ");
+            p->environ = file2strvec(path, p->dfd, "environ");
     }
 
     if (flags & (PROC_FILLCOM|PROC_FILLARG)) {  // read /proc/#/cmdline
         if (flags & PROC_EDITCMDLCVT)
             fill_cmdline_cvt(path, p);
         else
-            p->cmdline = file2strvec(path, "cmdline");
+            p->cmdline = file2strvec(path, p->dfd, "cmdline");
     }
 
     if ((flags & PROC_FILLCGROUP)) {            // read /proc/#/cgroup
         if (flags & PROC_EDITCGRPCVT)
             fill_cgroup_cvt(path, p);
         else
-            p->cgroup = file2strvec(path, "cgroup");
+            p->cgroup = file2strvec(path, p->dfd, "cgroup");
     }
 
     if (unlikely(flags & PROC_FILLOOM)) {
-        if (likely(file2str(path, "oom_score", &ub) != -1))
+        if (likely(file2str(path, p->dfd, "oom_score", &ub) != -1))
             oomscore2proc(ub.buf, p);
-        if (likely(file2str(path, "oom_adj", &ub) != -1))
+        if (likely(file2str(path, p->dfd, "oom_adj", &ub) != -1))
             oomadj2proc(ub.buf, p);
     }
 
@@ -1072,7 +1101,7 @@ static proc_t* simple_readproc(PROCTAB *restrict const PT, proc_t *restrict cons
         sd2proc(p);
 
     if (unlikely(flags & PROC_FILL_LXC))        // value the lxc name
-        p->lxcname = lxc_containers(path);
+        p->lxcname = lxc_containers(path, p->dfd);
 
     return p;
 next_proc:
@@ -1093,8 +1122,13 @@ static proc_t* simple_readtask(PROCTAB *restrict const PT, const proc_t *restric
     static struct stat sb;     // stat() buffer
     unsigned flags = PT->flags;
 
-    if (unlikely(stat(path, &sb) == -1))        /* no such dirent (anymore) */
-        goto next_task;
+    if (t->dfd >= 0) {
+        if (unlikely(fstat(t->dfd, &sb) == -1)) /* no such dirent (anymore) */
+            goto next_task;
+    } else {
+        if (unlikely(stat(path, &sb) == -1))
+            goto next_task;
+    }
 
 //  if ((flags & PROC_UID) && !XinLN(uid_t, sb.st_uid, PT->uids, PT->nuid))
 //      goto next_task;                         /* not one of the requested uids */
@@ -1103,19 +1137,19 @@ static proc_t* simple_readtask(PROCTAB *restrict const PT, const proc_t *restric
     t->egid = sb.st_gid;                        /* need a way to get real gid */
 
     if (flags & PROC_FILLSTAT) {                        // read /proc/#/task/#/stat
-        if (unlikely(file2str(path, "stat", &ub) == -1))
+        if (unlikely(file2str(path, t->dfd, "stat", &ub) == -1))
             goto next_task;
         stat2proc(ub.buf, t);
     }
 
 #ifndef QUICK_THREADS
     if (flags & PROC_FILLMEM)                           // read /proc/#/task/#statm
-        if (likely(file2str(path, "statm", &ub) != -1))
+        if (likely(file2str(path, t->dfd, "statm", &ub) != -1))
             statm2proc(ub.buf, t);
 #endif
 
     if (flags & PROC_FILLSTATUS) {                      // read /proc/#/task/#/status
-        if (likely(file2str(path, "status", &ub) != -1)) {
+        if (likely(file2str(path, t->dfd, "status", &ub) != -1)) {
             status2proc(ub.buf, t, 0);
 #ifndef QUICK_THREADS
             if (flags & PROC_FILLSUPGRP)
@@ -1147,7 +1181,7 @@ static proc_t* simple_readtask(PROCTAB *restrict const PT, const proc_t *restric
 #ifdef QUICK_THREADS
     if (!p) {
         if (flags & PROC_FILLMEM)
-            if (likely(file2str(path, "statm", &ub) != -1))
+            if (likely(file2str(dfd, "statm", &ub) != -1))
                 statm2proc(ub.buf, t);
 
         if (flags & PROC_FILLSUPGRP)
@@ -1157,28 +1191,28 @@ static proc_t* simple_readtask(PROCTAB *restrict const PT, const proc_t *restric
             if (flags & PROC_EDITENVRCVT)
                 fill_environ_cvt(path, t);
             else
-                t->environ = file2strvec(path, "environ");
+                t->environ = file2strvec(path, t->dfd, "environ");
         }
 
         if (flags & (PROC_FILLCOM|PROC_FILLARG)) {      // read /proc/#/task/#/cmdline
             if (flags & PROC_EDITCMDLCVT)
                 fill_cmdline_cvt(path, t);
             else
-                t->cmdline = file2strvec(path, "cmdline");
+                t->cmdline = file2strvec(path, t->dfd, "cmdline");
         }
 
         if ((flags & PROC_FILLCGROUP)) {                // read /proc/#/task/#/cgroup
             if (flags & PROC_EDITCGRPCVT)
                 fill_cgroup_cvt(path, t);
             else
-                t->cgroup = file2strvec(path, "cgroup");
+                t->cgroup = file2strvec(path, t->dfd, "cgroup");
         }
 
         if (unlikely(flags & PROC_FILLSYSTEMD))         // get sd-login.h stuff
             sd2proc(t);
 
         if (unlikely(flags & PROC_FILL_LXC))            // value the lxc name
-            t->lxcname = lxc_containers(path);
+            t->lxcname = lxc_containers(path, t->dfd);
 
 #ifdef QUICK_THREADS
     } else {
@@ -1209,9 +1243,9 @@ static proc_t* simple_readtask(PROCTAB *restrict const PT, const proc_t *restric
 #endif
 
     if (unlikely(flags & PROC_FILLOOM)) {
-        if (likely(file2str(path, "oom_score", &ub) != -1))
+        if (likely(file2str(path, t->dfd, "oom_score", &ub) != -1))
             oomscore2proc(ub.buf, t);
-        if (likely(file2str(path, "oom_adj", &ub) != -1))
+        if (likely(file2str(path, t->dfd, "oom_adj", &ub) != -1))
             oomadj2proc(ub.buf, t);
     }
 
@@ -1239,6 +1273,10 @@ static int simple_nextpid(PROCTAB *restrict const PT, proc_t *restrict const p) 
   }
   p->tgid = strtoul(ent->d_name, NULL, 10);
   p->tid = p->tgid;
+  if (PT->procfs_fd >= 0)
+    p->dfd = openat(PT->procfs_fd, ent->d_name, O_PATH | O_DIRECTORY);
+  else
+    p->dfd = -1;
   snprintf(path, PROCPATHLEN, "/proc/%s", ent->d_name);
   return 1;
 }
@@ -1251,11 +1289,19 @@ static int simple_nexttid(PROCTAB *restrict const PT, const proc_t *restrict con
   if(PT->taskdir_user != p->tgid){
     if(PT->taskdir){
       closedir(PT->taskdir);
+      close(PT->taskdir_fd);
     }
     // use "path" as some tmp space
-    snprintf(path, PROCPATHLEN, "/proc/%d/task", p->tgid);
-    PT->taskdir = opendir(path);
-    if(!PT->taskdir) return 0;
+    if (p->dfd >= 0){
+        PT->taskdir_fd = openat(p->dfd, "task", O_RDONLY | O_DIRECTORY);
+        if (PT->taskdir_fd < 0) return 0;
+        PT->taskdir = fdopendir(PT->taskdir_fd);
+        if(!PT->taskdir) { close(PT->taskdir_fd); return 0; }
+    }else{
+        snprintf(path, PROCPATHLEN, "/proc/%d/task", p->tgid);
+        PT->taskdir = opendir(path);
+        if(!PT->taskdir) return 0;
+    }
     PT->taskdir_user = p->tgid;
   }
   for (;;) {
@@ -1266,6 +1312,8 @@ static int simple_nexttid(PROCTAB *restrict const PT, const proc_t *restrict con
   t->tid = strtoul(ent->d_name, NULL, 10);
   t->tgid = p->tgid;
 //t->ppid = p->ppid;  // cover for kernel behavior? we want both actually...?
+  if (PT->taskdir_fd >= 0)
+      t->dfd = openat(PT->taskdir_fd, ent->d_name, O_PATH | O_DIRECTORY);
   snprintf(path, PROCPATHLEN, "/proc/%d/task/%s", p->tgid, ent->d_name);
   return 1;
 }
@@ -1277,6 +1325,10 @@ static int listed_nextpid(PROCTAB *restrict const PT, proc_t *restrict const p) 
   char *restrict const path = PT->path;
   pid_t tgid = *(PT->pids)++;
   if(likely(tgid)){
+    if (PT->procfs_fd >= 0){
+      snprintf(path, PROCPATHLEN, "%d", tgid);
+      p->dfd = openat(PT->procfs_fd, path, O_PATH | O_DIRECTORY);
+    }
     snprintf(path, PROCPATHLEN, "/proc/%d", tgid);
     p->tgid = tgid;
     p->tid = tgid;  // they match for leaders
@@ -1302,6 +1354,8 @@ proc_t* readproc(PROCTAB *restrict const PT, proc_t *restrict p) {
   PT->did_fake=0;
 //  if (PT->taskdir) {
 //    closedir(PT->taskdir);
+//    close(PT->taskdir_pid);
+//    PT->taskdir_pid = -1;
 //    PT->taskdir = NULL;
 //    PT->taskdir_user = -1;
 //  }
@@ -1395,7 +1449,7 @@ out:
 // return a null pointer (boolean false).  Use the passed buffer instead
 // of allocating space if it is non-NULL.
 proc_t* readeither (PROCTAB *restrict const PT, proc_t *restrict x) {
-    static proc_t skel_p;    // skeleton proc_t, only uses tid + tgid
+    static proc_t skel_p;    // skeleton proc_t, only uses dfd + tid + tgid
     static proc_t *new_p;    // for process/task transitions
     static int canary;
     char path[PROCPATHLEN];
@@ -1413,6 +1467,7 @@ next_proc:
     new_p = NULL;
     for (;;) {
         // fills in the PT->path, plus skel_p.tid and skel_p.tgid
+        // fills in skel_p.dfd, plus skel_p.tid and skel_p.tgid
         if (!PT->finder(PT,&skel_p)) goto end_procs;       // simple_nextpid
         if (!task_dir_missing) break;
         if ((ret = PT->reader(PT,x))) return ret;          // simple_readproc
@@ -1449,6 +1504,7 @@ PROCTAB* openproc(int flags, ...) {
         task_dir_missing = stat("/proc/self/task", &sbuf);
         did_stat = 1;
     }
+    PT->taskdir_fd = -1;
     PT->taskdir = NULL;
     PT->taskdir_user = -1;
     PT->taskfinder = simple_nexttid;
@@ -1456,11 +1512,18 @@ PROCTAB* openproc(int flags, ...) {
 
     PT->reader = simple_readproc;
     if (flags & PROC_PID){
+        PT->procfs_fd = -1;
         PT->procfs = NULL;
         PT->finder = listed_nextpid;
     }else{
-        PT->procfs = opendir("/proc");
-        if (!PT->procfs) { free(PT); return NULL; }
+        PT->procfs_fd = openat(-1, "/proc", O_RDONLY | O_DIRECTORY);
+        if (PT->procfs_fd >= 0) {
+            PT->procfs = fdopendir(PT->procfs_fd);
+            if (!PT->procfs) { close(PT->procfs_fd); free(PT); return NULL; }
+        } else if (errno == ENOSYS) {
+            PT->procfs = opendir("/proc");
+            if (!PT->procfs) { free(PT); return NULL; }
+        } else { free(PT); return NULL; }
         PT->finder = simple_nextpid;
     }
     PT->flags = flags;
@@ -1484,8 +1547,10 @@ PROCTAB* openproc(int flags, ...) {
 // terminate a process table scan
 void closeproc(PROCTAB* PT) {
     if (PT){
-        if (PT->procfs) closedir(PT->procfs);
-        if (PT->taskdir) closedir(PT->taskdir);
+        if (PT->procfs) { closedir(PT->procfs); PT->procfs_fd = -1; }
+        if (PT->procfs_fd >= 0) close(PT->procfs_fd);
+        if (PT->taskdir) { closedir(PT->taskdir); PT->taskdir_fd = -1; }
+        if (PT->taskdir_fd >= 0) close(PT->taskdir_fd);
         memset(PT,'#',sizeof(PROCTAB));
         free(PT);
     }
@@ -1503,8 +1568,7 @@ void freeproc(proc_t* p) {
 //////////////////////////////////////////////////////////////////////////////////
 void look_up_our_self(proc_t *p) {
     struct utlbuf_s ub = { NULL, 0 };
-
-    if(file2str("/proc/self", "stat", &ub) == -1){
+    if(file2str("/proc/self", -1, "stat", &ub) == -1){
         fprintf(stderr, "Error, do this: mount -t proc proc /proc\n");
         _exit(47);
     }
@@ -1676,19 +1740,28 @@ proc_t * get_proc_stats(pid_t pid, proc_t *p) {
     struct utlbuf_s ub = { NULL, 0 };
     static char path[32];
     struct stat statbuf;
+    int dfd;
 
     snprintf(path, sizeof path, "/proc/%d", pid);
-    if (stat(path, &statbuf)) {
+    dfd = open(path, O_RDONLY);
+    if (dfd == -1) {
+        perror("open");
+        return NULL;
+    }
+    if (fstat(dfd, &statbuf)) {
+        close(dfd);
         perror("stat");
         return NULL;
     }
 
-    if (file2str(path, "stat", &ub) >= 0)
+    if (file2str(path, dfd, "stat", &ub) >= 0)
         stat2proc(ub.buf, p);
-    if (file2str(path, "statm", &ub) >= 0)
+    if (file2str(path, dfd, "statm", &ub) >= 0)
         statm2proc(ub.buf, p);
-    if (file2str(path, "status", &ub) >= 0)
+    if (file2str(path, dfd, "status", &ub) >= 0)
         status2proc(ub.buf, p, 0);
+
+    close(dfd);
 
     free(ub.buf);
     return p;
