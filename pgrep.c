@@ -40,6 +40,8 @@
 
 #if defined(ENABLE_PIDWAIT) && !defined(HAVE_PIDFD_OPEN)
 #include <sys/epoll.h>
+#endif
+#if (defined(ENABLE_PWAIT) && !defined(HAVE_PIDFD_OPEN)) || !defined(HAVE_PIDFD_SEND_SIGNAL)
 #include <sys/syscall.h>
 #endif
 
@@ -530,7 +532,7 @@ static size_t get_arg_max(void)
 
     return val;
 }
-static struct el * select_procs (int *num)
+static struct el * select_procs (int *num, struct el **fds)
 {
 	PROCTAB *ptp;
 	proc_t task;
@@ -571,6 +573,8 @@ static struct el * select_procs (int *num)
 
 	memset(&task, 0, sizeof (task));
 	memset(&subtask, 0, sizeof (subtask));
+	task.dfd = -1;
+	subtask.dfd = -1;
 	while(readproc(ptp, &task)) {
 		int match = 1;
 
@@ -677,6 +681,14 @@ static struct el * select_procs (int *num)
 			if (matches == size) {
 				grow_size(size);
 				list = xrealloc(list, size * sizeof *list);
+				if (fds) {
+					*fds = xrealloc(*fds, size * sizeof **fds);
+				}
+			}
+			if (fds) {
+				(*fds)[matches].num = task.dfd;
+				/* take ownership of the fd */
+				task.dfd = -1;
 			}
 			if (list && (opt_long || opt_longlong || opt_echo)) {
 				list[matches].num = task.XXXID;
@@ -994,17 +1006,52 @@ static void parse_opts (int argc, char **argv)
 				     program_invocation_short_name);
 }
 
-inline static int execute_kill(pid_t pid, int sig_num)
+#if !defined(HAVE_PIDFD_SEND_SIGNAL)
+#ifndef __NR_pidfd_send_signal
+#  ifdef __alpha__
+#    define __NR_pidfd_send_signal 534
+#  else
+#    define __NR_pidfd_send_signal 424
+#  endif
+#endif
+static inline int pidfd_send_signal(int pidfd, int sig, siginfo_t *info, unsigned int flags)
 {
-    if (use_sigqueue)
-        return sigqueue(pid, sig_num, sigval);
-    else
-        return kill(pid, sig_num);
+    return syscall(__NR_pidfd_send_signal, pidfd, sig, info, flags);
+}
+#endif
+
+inline static int execute_kill(pid_t pid, int fd, int sig_num)
+{
+	if (fd >= 0) {
+		int ret, err;
+		if (use_sigqueue) {
+			siginfo_t info;
+			info.si_signo = sig_num;
+			info.si_errno = 0;
+			info.si_code = SI_QUEUE;
+			info.si_pid = getpid();
+			info.si_uid = getuid();
+			info.si_value = sigval;
+			ret = pidfd_send_signal(fd, sig_num, &info, 0);
+		} else {
+			ret = pidfd_send_signal(fd, sig_num, NULL, 0);
+		}
+		err = errno;
+		close(fd);
+		if (ret == 0 || err != ENOSYS)
+			return ret;
+	}
+
+	if (use_sigqueue)
+		return sigqueue(pid, sig_num, sigval);
+	else
+		return kill(pid, sig_num);
 }
 
 int main (int argc, char **argv)
 {
 	struct el *procs;
+	struct el *fds = NULL;
 	int num;
 	int i;
 	int kill_count = 0;
@@ -1025,7 +1072,7 @@ int main (int argc, char **argv)
 
 	parse_opts (argc, argv);
 
-	procs = select_procs (&num);
+	procs = select_procs (&num, prog_mode == PKILL ? &fds : NULL);
 	switch (prog_mode) {
 	case PGREP:
 		if (opt_count) {
@@ -1040,7 +1087,7 @@ int main (int argc, char **argv)
 
 	case PKILL:
 		for (i = 0; i < num; i++) {
-			if (execute_kill (procs[i].num, opt_signal) != -1) {
+			if (execute_kill (procs[i].num, fds[i].num, opt_signal) != -1) {
 				if (opt_echo)
 					printf(_("%s killed (pid %lu)\n"), procs[i].str, procs[i].num);
 				kill_count++;
