@@ -1058,7 +1058,7 @@ int main (int argc, char **argv)
 #ifdef ENABLE_PIDWAIT
 	int poll_count = 0;
 	int wait_count = 0;
-	int epollfd = epoll_create(1);
+	int epollfd;
 	struct epoll_event ev, events[32];
 #endif
 
@@ -1072,7 +1072,7 @@ int main (int argc, char **argv)
 
 	parse_opts (argc, argv);
 
-	procs = select_procs (&num, prog_mode == PKILL ? &fds : NULL);
+	procs = select_procs (&num, prog_mode == PGREP ? NULL : &fds);
 	switch (prog_mode) {
 	case PGREP:
 		if (opt_count) {
@@ -1107,6 +1107,8 @@ int main (int argc, char **argv)
 		if (opt_count)
 			fprintf(stdout, "%d\n", num);
 
+		epollfd = epoll_create(1);
+		struct stat st;
 		for (i = 0; i < num; i++) {
 			if (opt_echo)
 				printf(_("waiting for %s (pid %lu)\n"), procs[i].str, procs[i].num);
@@ -1115,6 +1117,13 @@ int main (int argc, char **argv)
 				/* ignore ESRCH, same as pkill */
 				if (errno != ESRCH)
 					xwarn(_("opening pid %ld failed"), procs[i].num);
+				continue;
+			}
+			/* verify the pid wasn't recycled */
+			int ret = fstatat(fds[i].num, "stat", &st, 0);
+			close(fds[i].num);
+			if (ret == -1) {
+				close(pidfd);
 				continue;
 			}
 			ev.events = EPOLLIN | EPOLLET;
