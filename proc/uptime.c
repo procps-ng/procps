@@ -54,6 +54,16 @@ static int count_users(void)
     return numuser;
 }
 
+static char* unit_string(int unit_value, char* singular, char* plural, int short_format, char* short_unit) {
+    if (short_format == 1)
+        return short_unit;
+
+    if (unit_value > 1)
+        return plural;
+    else
+        return singular;
+}
+
 /*
  * uptime:
  *
@@ -156,6 +166,12 @@ PROCPS_EXPORT char *procps_uptime_sprint_pretty(int short_format)
     int comma = 0;
     double uptime_secs, idle_secs;
 
+    if (short_format == 1) {
+        // reset position counter when short format is requested
+        // as we also want to omit the "up " string
+        pos = 0;
+    }
+
     shortbuf[0] = '\0';
     if (procps_uptime(&uptime_secs, &idle_secs) < 0)
         return shortbuf;
@@ -203,48 +219,53 @@ PROCPS_EXPORT char *procps_uptime_sprint_pretty(int short_format)
     uphours =   ((int) uptime_secs / (60*60)) % 24;
     upminutes = ((int) uptime_secs / (60)) % 60;
 */
-    strcat(shortbuf, "up ");
+    if (short_format == 0) {
+        strcat(shortbuf, "up ");
+    }
 
     if (updecades) {
-        pos += sprintf(shortbuf + pos, "%d %s",
-                       updecades, updecades > 1 ? "decades" : "decade");
+        pos += sprintf(shortbuf + pos, "%d%s",
+                       updecades, 
+                       unit_string(updecades, " decade", " decades", short_format, "D"));
         comma += 1;
     }
 
     if (upyears) {
-        pos += sprintf(shortbuf + pos, "%s%d %s",
+        pos += sprintf(shortbuf + pos, "%s%d%s",
                        comma > 0 ? ", " : "", upyears,
-                       upyears > 1 ? "years" : "year");
+                       unit_string(upyears, " year", " years", short_format, "y"));
         comma += 1;
     }
 
     if (upweeks) {
-        pos += sprintf(shortbuf + pos, "%s%d %s",
+        pos += sprintf(shortbuf + pos, "%s%d%s",
                        comma  > 0 ? ", " : "", upweeks,
-                       upweeks > 1 ? "weeks" : "week");
+                       unit_string(upweeks, " week", " weeks", short_format, "w"));
         comma += 1;
     }
 
     if (updays) {
-        pos += sprintf(shortbuf + pos, "%s%d %s",
+        pos += sprintf(shortbuf + pos, "%s%d%s",
                        comma  > 0 ? ", " : "", updays,
-                       updays > 1 ? "days" : "day");
+                       unit_string(updays, " day", " days", short_format, "d"));
         comma += 1;
     }
 
     if (uphours) {
-        pos += sprintf(shortbuf + pos, "%s%d %s",
+        pos += sprintf(shortbuf + pos, "%s%d%s",
                        comma  > 0 ? ", " : "", uphours,
-                       uphours > 1 ? "hours" : "hour");
+                       unit_string(uphours, " hour", " hours", short_format, "h"));
         comma += 1;
     }
 
     if (upminutes || (!upminutes && uptime_secs < 60)) {
-        pos += sprintf(shortbuf + pos, "%s%d %s",
+        pos += sprintf(shortbuf + pos, "%s%d%s",
                        comma > 0 ? ", " : "", upminutes,
-                       upminutes != 1 ? "minutes" : "minute");
+                       unit_string(upminutes, " minute", " minutes", short_format, "m"));
         comma += 1;
     }
     return shortbuf;
 }
+
+
 
