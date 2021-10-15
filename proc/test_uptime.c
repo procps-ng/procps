@@ -69,12 +69,22 @@ int check_uptime_sprint(void *data)
     return (str != NULL && str[0] != '\0');
 }
 
-int check_uptime_sprint_short(void *data)
+int check_uptime_sprint_pretty(void *data)
 {
     char *str;
     testname = "procps_uptime_sprint_pretty(0)";
 
     str = procps_uptime_sprint_pretty(0);
+
+    return (str != NULL && str[0] != '\0');
+}
+
+int check_uptime_sprint_pretty_short(void *data)
+{
+    char *str;
+    testname = "procps_uptime_sprint_pretty_short(1)";
+
+    str = procps_uptime_sprint_pretty(1);
 
     return (str != NULL && str[0] != '\0');
 }
@@ -85,7 +95,8 @@ TestFunction test_funcs[] = {
     check_uptime_nullidle,
     check_uptime_nullall,
     check_uptime_sprint,
-    check_uptime_sprint_short,
+    check_uptime_sprint_pretty,
+    check_uptime_sprint_pretty_short,
     NULL,
 };
 
