@@ -45,7 +45,7 @@ global:
 	procps_stat_sort;
 	procps_uptime;
 	procps_uptime_sprint;
-	procps_uptime_sprint_short;
+	procps_uptime_sprint_pretty;
 	procps_vmstat_new;
 	procps_vmstat_ref;
 	procps_vmstat_unref;

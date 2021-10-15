@@ -143,13 +143,13 @@ PROCPS_EXPORT char *procps_uptime_sprint(void)
 }
 
 /*
- * procps_uptime_sprint_short:
+ * procps_uptime_sprint_pretty:
  *
  * Print current time in nice format
  *
  * Returns a statically allocated buffer or NULL on error
  */
-PROCPS_EXPORT char *procps_uptime_sprint_short(void)
+PROCPS_EXPORT char *procps_uptime_sprint_pretty(void)
 {
     int updecades, upyears, upweeks, updays, uphours, upminutes;
     int pos = 3;

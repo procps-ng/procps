@@ -15718,7 +15718,7 @@ msgid ""
 "B<int    procps_loadavg (double * >I<av1>B<, double * >I<av5>B<, double * >I<av15>B<);>\n"
 "B<int    procps_uptime (double * >I<uptime_secs>B<, double * >I<idle_secs>B<);>\n"
 "B<char * procps_uptime_sprint (void);>\n"
-"B<char * procps_uptime_sprint_short (void);>\n"
+"B<char * procps_uptime_sprint_pretty (void);>\n"
 msgstr ""
 
 #. type: Plain text

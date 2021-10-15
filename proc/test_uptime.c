@@ -72,9 +72,9 @@ int check_uptime_sprint(void *data)
 int check_uptime_sprint_short(void *data)
 {
     char *str;
-    testname = "procps_uptime_sprint_short()";
+    testname = "procps_uptime_sprint_pretty()";
 
-    str = procps_uptime_sprint_short();
+    str = procps_uptime_sprint_pretty();
 
     return (str != NULL && str[0] != '\0');
 }
