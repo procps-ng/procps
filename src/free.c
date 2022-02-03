@@ -175,32 +175,61 @@ static void check_unit_set(int *unit_set)
 }
 
 /*
- * Print the header columns.
  * We cannot simply use the second printf because the length of the
  * translated strings doesn't work with it. Instead we need to find
  * the wide length of the string and use that.
- * This method also removes the messy wprintf/printf buffering issues
  */
-#define HC_WIDTH 9
-static void print_head_col(const char *str)
+static int str_terminal_width(const char *str)
 {
-    int len;
-    int spaces = 9;
+	int len;
     wchar_t wstr[BUFSIZ];
 
     len = mbstowcs(wstr, str, BUFSIZ);
     if (len < 0)
-        spaces = 9;
-    else if (len < HC_WIDTH) {
-        int width;
-        if ( (width = wcswidth(wstr, 99)) > 0)
-            spaces = HC_WIDTH - width;
-        else
-            spaces = HC_WIDTH - len;
-    } else
-        spaces = 0;
+        return 0;
 
-    printf("%s%.*s", str, spaces, "         ");
+	int width;
+	if ((width = wcswidth(wstr, 99)) > 0)
+		return width;
+	else
+		return len;
+}
+
+static int header_width(const char *str, int min_len)
+{
+	int len = str_terminal_width(str) + 2;
+	return len >= min_len ? len : min_len;
+}
+
+int max_head_l_width(const char **arr, int n)
+{
+	int max = header_width(arr[0], 0);
+    for (int i = 1; i < n; i++) {
+		int curr = header_width(arr[i], 0);
+        if (curr > max)
+            max = curr;
+	}
+    return max;
+}
+
+#define SPACES "                              "
+/*
+ * Print the header of a column (right-aligned).
+ * This method also removes the messy wprintf/printf buffering issues
+ */
+static void print_head_col(const char *str, int padding)
+{
+	int spaces_count = padding - str_terminal_width(str);
+    printf("%.*s%s", spaces_count, SPACES, str);
+}
+
+/*
+ * Print the header of a line (left-aligned).
+ */
+static void print_head_line(const char *str, int padding)
+{
+	int spaces_count = padding - str_terminal_width(str);
+    printf("%s%.*s", str, spaces_count, SPACES);
 }
 
 int main(int argc, char **argv)
@@ -370,30 +399,68 @@ int main(int argc, char **argv)
                   _("Unable to create meminfo structure"));
     }
 	do {
-		/* Translation Hint: You can use 9 character words in
-		 * the header, and the words need to be right align to
-		 * beginning of a number. */
+		/*
+		 * Get translations and compute their width
+		 * It’s necessary to do that ahead of time to be able to size the colums correctly.
+		 */
+		const char *mem_head_l = _("Mem:");
+		const char *low_head_l = _("Low:");
+		const char *high_head_l = _("High:");
+		const char *swap_head_l = _("Swap:");
+		const char *total_head_l = _("Total:");
+		const char *comm_head_l = _("Comm:");
+		const char *head_l_arr[] = { mem_head_l,low_head_l, high_head_l, swap_head_l, total_head_l, comm_head_l };
+		int head_line_width = max_head_l_width(head_l_arr, sizeof(head_l_arr) / sizeof(char *));
+
+		char *total_head = _("total");
+		char *used_head = _("used");
+		char *free_head =_("free");
+		char *shared_head = _("shared");
+		char *buffers_head = _("buffers");
+		char *cache_head = _("cache");
+		char *buffcache_head = _("buffer/cache");
+		char *available_head = _("available");
+
+		int total_head_width = header_width(total_head, 12);
+		int used_head_width = header_width(used_head, 12);
+		int free_head_width = header_width(free_head, 12);
+		int shared_head_width = header_width(shared_head, 12);
+		int buffers_head_width = header_width(buffers_head, 12);
+		int cache_head_width = header_width(cache_head, 12);
+		int buffcache_head_width = header_width(buffcache_head, 12);
+		int available_head_width = header_width(available_head, 12);
+
+		print_head_line("", head_line_width);
+		print_head_col(total_head, total_head_width);
+		print_head_col(used_head, used_head_width);
+		print_head_col(free_head, free_head_width);
+		print_head_col(shared_head, shared_head_width);
 		if (flags & FREE_WIDE) {
-			printf(_("               total        used        free      shared     buffers       cache   available"));
+			print_head_col(buffers_head, buffers_head_width);
+			print_head_col(cache_head, cache_head_width);
 		} else {
-			printf(_("               total        used        free      shared  buff/cache   available"));
+			print_head_col(buffcache_head, buffcache_head_width);
 		}
+		print_head_col(available_head, available_head_width);
 		printf("\n");
-		print_head_col(_("Mem:"));
-		printf("%11s", scale_size(MEMINFO_GET(mem_info, MEMINFO_MEM_TOTAL, ul_int), flags, args));
-		printf(" %11s", scale_size(MEMINFO_GET(mem_info, MEMINFO_MEM_USED, ul_int), flags, args));
-		printf(" %11s", scale_size(MEMINFO_GET(mem_info, MEMINFO_MEM_FREE, ul_int), flags, args));
-		printf(" %11s", scale_size(MEMINFO_GET(mem_info, MEMINFO_MEM_SHARED, ul_int), flags, args));
+
+		print_head_line(mem_head_l, head_line_width);
+		printf("%*s", total_head_width, scale_size(MEMINFO_GET(mem_info, MEMINFO_MEM_TOTAL, ul_int), flags, args));
+		printf("%*s", used_head_width, scale_size(MEMINFO_GET(mem_info, MEMINFO_MEM_USED, ul_int), flags, args));
+		printf("%*s", free_head_width, scale_size(MEMINFO_GET(mem_info, MEMINFO_MEM_FREE, ul_int), flags, args));
+		printf("%*s", shared_head_width, scale_size(MEMINFO_GET(mem_info, MEMINFO_MEM_SHARED, ul_int), flags, args));
 		if (flags & FREE_WIDE) {
-			printf(" %11s", scale_size(MEMINFO_GET(mem_info, MEMINFO_MEM_BUFFERS, ul_int),
+			printf("%*s", buffers_head_width, scale_size(MEMINFO_GET(mem_info, MEMINFO_MEM_BUFFERS, ul_int),
 				    flags, args));
-			printf(" %11s", scale_size(MEMINFO_GET(mem_info, MEMINFO_MEM_CACHED_ALL, ul_int)
+			printf("%*s", cache_head_width, scale_size(MEMINFO_GET(mem_info, MEMINFO_MEM_CACHED_ALL, ul_int)
 				    , flags, args));
 		} else {
-			printf(" %11s", scale_size(MEMINFO_GET(mem_info, MEMINFO_MEM_BUFFERS, ul_int) +
+			printf("%*s", buffcache_head_width,
+				    scale_size(MEMINFO_GET(mem_info, MEMINFO_MEM_BUFFERS, ul_int) +
 				    MEMINFO_GET(mem_info, MEMINFO_MEM_CACHED_ALL, ul_int), flags, args));
 		}
-		printf(" %11s", scale_size(MEMINFO_GET(mem_info, MEMINFO_MEM_AVAILABLE, ul_int), flags, args));
+		printf("%*s", available_head_width, scale_size(MEMINFO_GET(mem_info, MEMINFO_MEM_AVAILABLE, ul_int),
+		        flags, args));
 		printf("\n");
 		/*
 		 * Print low vs. high information, if the user requested it.
@@ -402,43 +469,52 @@ int main(int argc, char **argv)
 		 * to print the high info, even if it is zero.
 		 */
 		if (flags & FREE_LOHI) {
-			print_head_col(_("Low:"));
-			printf("%11s", scale_size(MEMINFO_GET(mem_info, MEMINFO_MEM_LOW_TOTAL, ul_int), flags, args));
-			printf(" %11s", scale_size(MEMINFO_GET(mem_info, MEMINFO_MEM_LOW_USED, ul_int), flags, args));
-			printf(" %11s", scale_size(MEMINFO_GET(mem_info, MEMINFO_MEM_LOW_FREE, ul_int), flags, args));
+			print_head_line(low_head_l, head_line_width);
+			printf("%*s", total_head_width,
+					scale_size(MEMINFO_GET(mem_info, MEMINFO_MEM_LOW_TOTAL, ul_int), flags, args));
+			printf("%*s", used_head_width,
+					scale_size(MEMINFO_GET(mem_info, MEMINFO_MEM_LOW_USED, ul_int), flags, args));
+			printf("%*s", free_head_width,
+					scale_size(MEMINFO_GET(mem_info, MEMINFO_MEM_LOW_FREE, ul_int), flags, args));
 			printf("\n");
 
-			print_head_col( _("High:"));
-			printf("%11s", scale_size(MEMINFO_GET(mem_info, MEMINFO_MEM_HIGH_TOTAL, ul_int), flags, args));
-			printf(" %11s", scale_size(MEMINFO_GET(mem_info, MEMINFO_MEM_HIGH_USED, ul_int), flags, args));
-			printf(" %11s", scale_size(MEMINFO_GET(mem_info, MEMINFO_MEM_HIGH_FREE, ul_int), flags, args));
+			print_head_line(high_head_l, head_line_width);
+			printf("%*s", total_head_width,
+					scale_size(MEMINFO_GET(mem_info, MEMINFO_MEM_HIGH_TOTAL, ul_int), flags, args));
+			printf("%*s", used_head_width,
+					scale_size(MEMINFO_GET(mem_info, MEMINFO_MEM_HIGH_USED, ul_int), flags, args));
+			printf("%*s", free_head_width,
+					scale_size(MEMINFO_GET(mem_info, MEMINFO_MEM_HIGH_FREE, ul_int), flags, args));
 			printf("\n");
 		}
 
-		print_head_col(_("Swap:"));
-		printf("%11s", scale_size(MEMINFO_GET(mem_info, MEMINFO_SWAP_TOTAL, ul_int), flags, args));
-		printf(" %11s", scale_size(MEMINFO_GET(mem_info, MEMINFO_SWAP_USED, ul_int), flags, args));
-		printf(" %11s", scale_size(MEMINFO_GET(mem_info, MEMINFO_SWAP_FREE, ul_int), flags, args));
+		print_head_line(swap_head_l, head_line_width);
+		printf("%*s", total_head_width, scale_size(MEMINFO_GET(mem_info, MEMINFO_SWAP_TOTAL, ul_int), flags, args));
+		printf("%*s", used_head_width, scale_size(MEMINFO_GET(mem_info, MEMINFO_SWAP_USED, ul_int), flags, args));
+		printf("%*s", free_head_width, scale_size(MEMINFO_GET(mem_info, MEMINFO_SWAP_FREE, ul_int), flags, args));
 		printf("\n");
 
 		if (flags & FREE_TOTAL) {
-			print_head_col(_("Total:"));
-			printf("%11s", scale_size(
+			print_head_line(total_head_l, head_line_width);
+			printf("%*s", total_head_width, scale_size(
 				    MEMINFO_GET(mem_info, MEMINFO_MEM_TOTAL, ul_int) +
 				    MEMINFO_GET(mem_info, MEMINFO_SWAP_TOTAL, ul_int), flags, args));
-			printf(" %11s", scale_size(
+			printf("%*s", used_head_width, scale_size(
 				    MEMINFO_GET(mem_info, MEMINFO_MEM_USED, ul_int) +
 				    MEMINFO_GET(mem_info, MEMINFO_SWAP_USED, ul_int), flags, args));
-			printf(" %11s", scale_size(
+			printf("%*s", free_head_width, scale_size(
 				    MEMINFO_GET(mem_info, MEMINFO_MEM_FREE, ul_int) +
 				    MEMINFO_GET(mem_info, MEMINFO_SWAP_FREE, ul_int), flags, args));
 			printf("\n");
 		}
+
 		if (flags & FREE_COMMITTED) {
-			print_head_col(_("Comm:"));
-			printf("%11s", scale_size(MEMINFO_GET(mem_info, MEMINFO_MEM_COMMIT_LIMIT, ul_int), flags, args));
-			printf(" %11s", scale_size(MEMINFO_GET(mem_info, MEMINFO_MEM_COMMITTED_AS, ul_int), flags, args));
-			printf(" %11s", scale_size(
+			print_head_line(comm_head_l, head_line_width);
+			printf("%*s", total_head_width,
+			        scale_size(MEMINFO_GET(mem_info, MEMINFO_MEM_COMMIT_LIMIT, ul_int), flags, args));
+			printf("%*s", used_head_width,
+			        scale_size(MEMINFO_GET(mem_info, MEMINFO_MEM_COMMITTED_AS, ul_int), flags, args));
+			printf("%*s", free_head_width, scale_size(
 				    MEMINFO_GET(mem_info, MEMINFO_MEM_COMMIT_LIMIT, ul_int) -
 				    MEMINFO_GET(mem_info, MEMINFO_MEM_COMMITTED_AS, ul_int), flags, args));
 			printf("\n");
