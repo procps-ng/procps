@@ -3816,6 +3816,9 @@ static void before (char *me) {
          default:
             sa.sa_handler = sig_abexit;
             break;
+         case SIGURG:
+         // urgent condition on socket, ignore it
+         // fall through
          case SIGKILL: case SIGSTOP:
          // because uncatchable, fall through
          case SIGCHLD: // we can't catch this
