@@ -1166,6 +1166,7 @@ int main(int argc, char **argv)
 	discover_shm_minor();
 
 	memset(&p, '\0', sizeof(p));
+	p.dfd = -1;
 	/* old libproc interface is zero-terminated */
 	pidlist[count] = 0;
 	PT = openproc(PROC_FILLSTAT | PROC_FILLARG | PROC_PID, pidlist);

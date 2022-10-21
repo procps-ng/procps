@@ -50,9 +50,11 @@ extern int get_ns_id(const char *name);
 //
 typedef struct proc_t {
 // 1st 16 bytes
-    int
+    pid_t
         tid,		// (special)       task id, the POSIX thread ID (see also: tgid)
     	ppid;		// stat,status     pid of parent process
+    int
+	dfd; 		// (special)       fd of the process directory in /proc
     unsigned long       // next 2 fields are NOT filled in by readproc
         maj_delta,      // stat (special) major page faults since last update
         min_delta;      // stat (special) minor page faults since last update
@@ -196,8 +198,10 @@ typedef struct proc_t {
 #define PROCPATHLEN 64  // must hold /proc/2000222000/task/2000222000/cmdline
 
 typedef struct PROCTAB {
+    int 	procfs_fd;
     DIR*	procfs;
 //    char deBug0[64];
+    int 	taskdir_fd;
     DIR*	taskdir;  // for threads
 //    char deBug1[64];
     pid_t	taskdir_user;  // for threads
