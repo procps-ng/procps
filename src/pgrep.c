@@ -118,6 +118,7 @@ static int opt_oldest = 0;
 static int opt_older = 0;
 static int opt_newest = 0;
 static int opt_negate = 0;
+static int opt_negate_age = 0;
 static int opt_exact = 0;
 static int opt_count = 0;
 static int opt_signal = SIGTERM;
@@ -748,9 +749,9 @@ static struct el * select_procs (int *num)
             continue;
         else if (opt_ignore_ancestors && match_numlist(PIDS_GETINT(PID), opt_ignore_ancestors))
             continue;
-        else if (opt_newest && PIDS_GETULL(STARTTIME) < saved_start_time)
+        else if (opt_newest && !opt_negate_age && PIDS_GETULL(STARTTIME) < saved_start_time)
             match = 0;
-        else if (opt_oldest && PIDS_GETULL(STARTTIME) > saved_start_time)
+        else if (opt_oldest && !opt_negate_age && PIDS_GETULL(STARTTIME) > saved_start_time)
             match = 0;
         else if (opt_ppid && ! match_numlist(PIDS_GETINT(PPID), opt_ppid))
             match = 0;
@@ -802,25 +803,43 @@ static struct el * select_procs (int *num)
                 match = 0;
         }
 
+        /* All normal conditions are done, only -n and -o left.  With
+         * --inverse, all processes with match=1 should be reported,
+         * except the newest or the oldest of them (stored in
+         * saved_pid)
+         */
+        if (match && opt_newest) {
+            if (saved_start_time < PIDS_GETULL(STARTTIME) ||
+                saved_start_time == PIDS_GETULL(STARTTIME) &&
+                saved_pid < PIDS_GETINT(PID))
+            {
+                saved_start_time = PIDS_GETULL(STARTTIME);
+                saved_pid = PIDS_GETINT(PID);
+                if (!opt_negate_age)
+                    /* forget previous match, if any */
+                    matches = 0;
+            } else if (!opt_negate_age) {
+                continue;
+            }
+        }
+        if (match && opt_oldest) {
+            if (saved_start_time > PIDS_GETULL(STARTTIME) ||
+                saved_start_time == PIDS_GETULL(STARTTIME) &&
+                saved_pid > PIDS_GETINT(PID))
+            {
+                saved_start_time = PIDS_GETULL(STARTTIME);
+                saved_pid = PIDS_GETINT(PID);
+                if (!opt_negate_age)
+                    matches = 0;
+            } else if (!opt_negate_age) {
+                continue;
+            }
+        }
+
+        /* opt_negate is always false when opt_negate_age is set */
         if (match ^ opt_negate) {    /* Exclusive OR is neat */
-            if (opt_newest) {
-                if (saved_start_time == PIDS_GETULL(STARTTIME) &&
-                    saved_pid > PIDS_GETINT(PID))
-                    continue;
-                saved_start_time = PIDS_GETULL(STARTTIME);
-                saved_pid = PIDS_GETINT(PID);
-                matches = 0;
-            }
-            if (opt_oldest) {
-                if (saved_start_time == PIDS_GETULL(STARTTIME) &&
-                    saved_pid < PIDS_GETINT(PID))
-                    continue;
-                saved_start_time = PIDS_GETULL(STARTTIME);
-                saved_pid = PIDS_GETINT(PID);
-                matches = 0;
-            }
             if (matches == size) {
-				grow_size(size);
+                grow_size(size);
                 list = xrealloc(list, size * sizeof *list);
             }
             if (list && (opt_long || opt_longlong || opt_echo)) {
@@ -843,6 +862,20 @@ static struct el * select_procs (int *num)
         free(preg);
     }
 
+    if (opt_negate_age) {
+        int i;
+        for (i = 0; i < matches; i++) {
+            if (list[i].num != saved_pid)
+                continue;
+            if (--matches == i) {
+                /* Do nothing.  Could free(list[i].str)
+                 * but it might be uninitialised. */
+            } else {
+                memmove(list + i, list + i + 1, (matches - i) * sizeof(list[0]));
+                break;
+            }
+        }
+    }
     *num = matches;
 
     if ((!matches) && (!opt_full) && is_long_match(opt_pattern))
@@ -1050,14 +1083,22 @@ static void parse_opts (int argc, char **argv)
             opt_ignore_ancestors = get_our_ancestors();
             break;
         case 'n':   /* Solaris: match only the newest */
-            if (opt_oldest|opt_negate|opt_newest)
+            if (opt_oldest|opt_negate_age|opt_newest)
                 usage ('?');
+            if (opt_negate) {
+                opt_negate = 0;
+                opt_negate_age = 1;
+            }
             opt_newest = 1;
             ++criteria_count;
             break;
         case 'o':   /* Solaris: match only the oldest */
-            if (opt_oldest|opt_negate|opt_newest)
+            if (opt_oldest|opt_negate_age|opt_newest)
                 usage ('?');
+            if (opt_negate) {
+                opt_negate = 0;
+                opt_negate_age = 1;
+            }
             opt_oldest = 1;
             ++criteria_count;
             break;
@@ -1084,9 +1125,12 @@ static void parse_opts (int argc, char **argv)
             ++criteria_count;
             break;
         case 'v':   /* Solaris: as in grep, invert the matching (uh... applied after selection I think) */
-            if (opt_oldest|opt_negate|opt_newest)
+            if (opt_negate|opt_negate_age)
                 usage ('?');
-            opt_negate = 1;
+            if (opt_oldest|opt_newest)
+                opt_negate_age = 1;
+            else
+                opt_negate = 1;
             break;
         case 'w':   // Linux: show threads (lightweight process) too
             opt_threads = 1;
