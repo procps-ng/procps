@@ -63,6 +63,22 @@ set test "pgrep find oldest test pid"
 spawn $pgrep -o $testproc_comm
 expect_pass "$test" "^$testproc1_pid\\s*$"
 
+set test "pgrep find not newest test pid"
+spawn $pgrep -v -n $testproc_comm
+expect_pass "$test" "^$testproc1_pid\\s*$"
+
+set test "pgrep find not oldest test pid"
+spawn $pgrep -v -o $testproc_comm
+expect_pass "$test" "^$testproc2_pid\\s*$"
+
+set test "pgrep find not newest test pid with multiple criteria"
+spawn $pgrep -v -n -s $testproc1_sid $testproc_comm
+expect_pass "$test" "^$testproc1_pid\\s*$"
+
+set test "pgrep find not oldest test pid with multiple criteria"
+spawn $pgrep -v -o -s $testproc1_sid $testproc_comm
+expect_pass "$test" "^$testproc2_pid\\s*$"
+
 set test "pgrep matches with parent pid"
 spawn $pgrep -P $mypid $testproc_comm
 expect_pass "$test" "^$testproc1_pid\\s+$testproc2_pid\\s*$"
