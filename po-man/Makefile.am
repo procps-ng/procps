@@ -7,7 +7,60 @@
 #   make -C po-man man.stamp
 # To update man page translations
 
-src_MANS = $(wildcard $(top_srcdir)/man/*.[1-9])
+# src_MANS is the same as topdir Makefile.am dist_man_MANS, but it can't pass
+# directly, so the same definition is implemented based on topdir Makefile.am
+src_MANS = \
+	../man/free.1 \
+	../man/pgrep.1 \
+	../man/pkill.1 \
+	../man/pmap.1 \
+	../man/uptime.1 \
+	../man/vmstat.8 \
+	../man/procps.3 \
+	../man/procps_pids.3 \
+	../man/procps_misc.3
+
+if !CYGWIN
+src_MANS += \
+	../man/pwdx.1 \
+	../man/tload.1 \
+	../man/sysctl.8 \
+	../man/sysctl.conf.5 \
+	../man/ps.1
+
+if BUILD_PIDWAIT
+src_MANS += ../man/pidwait.1
+endif
+endif
+
+if BUILD_PIDOF
+src_MANS += ../man/pidof.1
+endif
+
+if BUILD_KILL
+src_MANS += ../man/kill.1
+endif
+
+if BUILD_W
+src_MANS += ../man/w.1
+endif
+
+if WITH_NCURSES
+src_MANS += \
+	../man/watch.1 \
+	../man/top.1
+if !CYGWIN
+src_MANS += \
+	../man/slabtop.1 \
+	../man/hugetop.1
+endif
+endif
+
+if BUILD_SKILL
+src_MANS += \
+	../man/skill.1 \
+	../man/snice.1
+endif
 
 translated_MANS = $(wildcard translated/*/*.[1-9])
 translated_MAN_sections=$(subst .,,$(sort $(suffix $(translated_MANS))))
