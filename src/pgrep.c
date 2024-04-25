@@ -44,9 +44,11 @@
 
 #ifdef ENABLE_PIDWAIT
 #include <sys/epoll.h>
-#ifndef HAVE_PIDFD_OPEN
+#ifdef HAVE_PIDFD_OPEN
+#include <sys/pidfd.h>
+#else
 #include <sys/syscall.h>
-#endif /* !HAVE_PIDFD_OPEN */
+#endif
 #endif
 
 /* EXIT_SUCCESS is 0 */
@@ -876,6 +878,11 @@ static int signal_option(int *argc, char **argv)
 }
 
 #if defined(ENABLE_PIDWAIT) && !defined(HAVE_PIDFD_OPEN)
+
+#ifndef __NR_pidfd_open
+#define __NR_pidfd_open 434 /* from linux/include/uapi/asm-generic/unistd.h */
+#endif
+
 static int pidfd_open (pid_t pid, unsigned int flags)
 {
 	return syscall(__NR_pidfd_open, pid, flags);
