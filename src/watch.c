@@ -1,6 +1,7 @@
 /*
  * watch - execute a program repeatedly, displaying output fullscreen
  *
+ * Copyright © 2024 Stuart Blake Tener <stuart.tener@bh90210.net>
  * Copyright © 2023 Roman Žilka <roman.zilka@gmail.com>
  * Copyright © 2010-2023 Jim Warner <james.warner@comcast.net>
  * Copyright © 2015-2023 Craig Small <csmall@dropbear.xyz>
@@ -92,6 +93,8 @@
 #define WATCH_PRECISE  (1 << 9)
 #define WATCH_NOWRAP   (1 << 10)
 #define WATCH_NOTITLE  (1 << 11)
+#define WATCH_OKEXIT   (1 << 12)
+#define WATCH_NOKEYPR  (1 << 13)
 // Do we care about screen contents changes at all?
 #define WATCH_ALL_DIFF (WATCH_DIFF | WATCH_CHGEXIT | WATCH_EQUEXIT)
 
@@ -119,12 +122,14 @@ static void __attribute__ ((__noreturn__)) usage(FILE * out)
 	fputs(_("  -C, --no-color         do not interpret ANSI color and style sequences\n"), out);
 	fputs(_("  -d, --differences[=<permanent>]\n"
 	        "                         highlight changes between updates\n"), out);
-	fputs(_("  -e, --errexit          exit if command has a non-zero exit\n"), out);
+	fputs(_("  -e, --errexit          exit if command has a non-zero exit code\n"), out);
 	fputs(_("  -g, --chgexit          exit when output from command changes\n"), out);
+	fputs(_("  -k, --nokeypr          do not wait for a keypress\n"), out);
+	fputs(_("  -n, --interval <secs>  seconds to wait between updates\n"), out);
+	fputs(_("  -o, --okexit           exit if command has a zero exit code\n"), out);
+	fputs(_("  -p, --precise          -n includes command running time\n"), out);  // TODO: gettext
 	fputs(_("  -q, --equexit <cycles>\n"
 	        "                         exit when output from command does not change\n"), out);
-	fputs(_("  -n, --interval <secs>  seconds to wait between updates\n"), out);
-	fputs(_("  -p, --precise          -n includes command running time\n"), out);  // TODO: gettext
 	fputs(_("  -r, --no-rerun         do not rerun program on window resize\n"), out);
 	fputs(_("  -s, --shotsdir         directory to store screenshots\n"), out);  // TODO: gettext
 	fputs(_("  -t, --no-title         turn off header\n"), out);
@@ -1110,7 +1115,9 @@ int main(int argc, char *argv[])
 		{"interval", required_argument, 0, 'n'},
 		{"beep", no_argument, 0, 'b'},
 		{"errexit", no_argument, 0, 'e'},
+		{"okexit", no_argument, 0, 'o'},
 		{"chgexit", no_argument, 0, 'g'},
+		{"nokeypr", no_argument, 0, 'k'},
 		{"equexit", required_argument, 0, 'q'},
 		{"exec", no_argument, 0, 'x'},
 		{"precise", no_argument, 0, 'p'},
@@ -1167,6 +1174,12 @@ int main(int argc, char *argv[])
 			break;
 		case 'g':
 			flags |= WATCH_CHGEXIT;
+			break;
+		case 'k':
+			flags |= WATCH_NOKEYPR;
+			break;
+		case 'o':
+			flags |= WATCH_OKEXIT;
 			break;
 		case 'q':
 			max_cycles = strtol_or_err(optarg, _("failed to parse argument"));
@@ -1284,20 +1297,47 @@ int main(int argc, char *argv[])
 			output_lowheader(last_tick - t, cmdexit);
 		}
 
-		if (cmdexit) {
+		if (cmdexit)
+		{
 			if (flags & WATCH_BEEP)
 				beep();  // doesn't require refresh()
-			if (flags & WATCH_ERREXIT) {
+			if (flags & WATCH_ERREXIT)
+			{
 				// TODO: Hard to see when there's cmd output around it. Add
 				// spaces or move to lowheader.
 				mvaddstr(height-1, 0, _("command exit with a non-zero status, press a key to exit"));
 				i = fcntl(STDIN_FILENO, F_GETFL);
-				if (i >= 0 && fcntl(STDIN_FILENO, F_SETFL, i|O_NONBLOCK) >= 0) {
+				if (i >= 0 && fcntl(STDIN_FILENO, F_SETFL, i|O_NONBLOCK) >= 0)
+				{
 					while (getchar() != EOF) ;
 					fcntl(STDIN_FILENO, F_SETFL, i);
 				}
 				refresh();
 				getchar();
+				endwin_exit(cmdexit);
+			}
+		}
+		else
+		{
+			if (flags & WATCH_OKEXIT)
+			{
+				if (flags & WATCH_NOKEYPR)
+				{
+					mvaddstr(height-1, 0, _("command exit with a zero status"));
+					refresh();
+				}
+				else
+				{
+					mvaddstr(height-1, 0, _("command exit with a zero status, press a key to exit"));
+					i = fcntl(STDIN_FILENO, F_GETFL);
+					if (i >= 0 && fcntl(STDIN_FILENO, F_SETFL, i|O_NONBLOCK) >= 0)
+					{
+						while (getchar() != EOF) ;
+						fcntl(STDIN_FILENO, F_SETFL, i);
+					}
+					refresh();
+					getchar();
+				}
 				endwin_exit(cmdexit);
 			}
 		}
