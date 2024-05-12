@@ -1,7 +1,7 @@
 /*
  * watch - execute a program repeatedly, displaying output fullscreen
  *
- * Copyright © 2024 Stuart Blake Tener <stuart.tener@bh90210.net>
+ * Copyright © 2024 Stuart Blake Tener, BSCS, N3GWG <stuart.tener@bh90210.net>
  * Copyright © 2023 Roman Žilka <roman.zilka@gmail.com>
  * Copyright © 2010-2023 Jim Warner <james.warner@comcast.net>
  * Copyright © 2015-2023 Craig Small <csmall@dropbear.xyz>
