@@ -1,7 +1,7 @@
 /*
  * meminfo.c - memory related definitions for libproc2
  *
- * Copyright © 2015-2023 Jim Warner <james.warner@comcast.net>
+ * Copyright © 2015-2024 Jim Warner <james.warner@comcast.net>
  * Copyright © 2015-2023 Craig Small <csmall@dropbear.xyz>
  *
  * This library is free software; you can redistribute it and/or
@@ -564,9 +564,9 @@ static int meminfo_make_hash_failed (
         struct meminfo_info *info)
 {
  #define htVAL(f) e.key = STRINGIFY(f); e.data = &info->hist.new. f; \
-  if (!hsearch_r(e, ENTER, &ep, &info->hashtab)) return 1;
+  if (!hsearch_r(e, ENTER, &ep, &info->hashtab)) goto err_return;
  #define htXTRA(k,f) e.key = STRINGIFY(k); e.data = &info->hist.new. f; \
-  if (!hsearch_r(e, ENTER, &ep, &info->hashtab)) return 1;
+  if (!hsearch_r(e, ENTER, &ep, &info->hashtab)) goto err_return;
     ENTRY e, *ep;
     size_t n;
 
@@ -574,7 +574,7 @@ static int meminfo_make_hash_failed (
     n = sizeof(struct meminfo_data) / sizeof(unsigned long);
     // we'll follow the hsearch recommendation of an extra 25%
     if (!hcreate_r(n + (n / 4), &info->hashtab))
-        return 1;
+        goto err_return;
 
     htVAL(Active)
     htXTRA(Active(anon), Active_anon)
@@ -622,6 +622,7 @@ static int meminfo_make_hash_failed (
     htVAL(Percpu)
     htVAL(SReclaimable)
     htVAL(SUnreclaim)
+    htVAL(SecPageTables)
     htVAL(ShadowCallStack)
     htVAL(Shmem)
     htVAL(ShmemHugePages)
@@ -630,6 +631,7 @@ static int meminfo_make_hash_failed (
     htVAL(SwapCached)
     htVAL(SwapFree)
     htVAL(SwapTotal)
+    htVAL(Unaccepted)
     htVAL(Unevictable)
     htVAL(VmallocChunk)
     htVAL(VmallocTotal)
@@ -640,6 +642,8 @@ static int meminfo_make_hash_failed (
     htVAL(Zswapped)
 
     return 0;
+ err_return:
+    return 1;
  #undef htVAL
  #undef htXTRA
 } // end: meminfo_make_hash_failed
@@ -671,9 +675,17 @@ static int meminfo_read_failed (
     if (-1 == info->meminfo_fd
     && (-1 == (info->meminfo_fd = open(MEMINFO_FILE, O_RDONLY))))
         return 1;
-
-    if (lseek(info->meminfo_fd, 0L, SEEK_SET) == -1)
-        return 1;
+    else {
+        if (-1 == lseek(info->meminfo_fd, 0L, SEEK_SET)) {
+            /* a concession to libvirt lxc support, which has been
+               known to treat a /proc file as non-seekable ... */
+            if (ESPIPE != errno)
+                return 1;
+            close(info->meminfo_fd);
+            if (-1 == (info->meminfo_fd = open(MEMINFO_FILE, O_RDONLY)))
+                return 1;
+        }
+    }
 
     for (;;) {
         if ((size = read(info->meminfo_fd, buf, sizeof(buf)-1)) < 0) {

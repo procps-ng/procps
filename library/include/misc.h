@@ -87,6 +87,13 @@ int procps_ns_get_id (const char *name);
 int procps_ns_read_pid (const int pid, struct procps_ns *nsp);
 
 
+// //////////////////////////////////////////////////////////////////
+// Mask Name Resolving //////////////////////////////////////////////
+
+int procps_sigmask_names (char *str, size_t size, const char *sigmask);
+
+int procps_capmask_names (char *str, size_t size, const char *capmask);
+
 #ifdef __cplusplus
 }
 #endif

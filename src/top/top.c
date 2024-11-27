@@ -1,6 +1,6 @@
 /* top.c - Source file:         show Linux processes */
 /*
- * Copyright © 2002-2023 Jim Warner <james.warner@comcast.net
+ * Copyright © 2002-2024 Jim Warner <james.warner@comcast.net
  *
  * This file may be used subject to the terms and conditions of the
  * GNU Library General Public License Version 2, or any later version
@@ -120,12 +120,12 @@ static int   Screen_cols, Screen_rows, Max_lines;
 #define      BOT_SEP_SPC  ' '
         // 1 for horizontal separator
 #define      BOT_RSVD  1
-#define      BOT_KEEP  Bot_show_func = NULL
-#define      BOT_TOSS  do { Bot_show_func = NULL; Bot_item[0] = BOT_DELIMIT; \
-                Bot_task = Bot_rsvd = Bot_what = 0; \
-                Bot_indx = BOT_UNFOCUS; \
-                } while(0)
-static int   Bot_task,
+#define      BOT_KEEP  { Bot_new = 0; }
+#define      BOT_TOSS  { Bot_new = Bot_task = Bot_what = Bot_rsvd = 0; \
+                Bot_item[0] = BOT_DELIMIT; \
+                Bot_indx = BOT_UNFOCUS; }
+static int   Bot_new,
+             Bot_task,
              Bot_what,
              Bot_rsvd,
              Bot_indx = BOT_UNFOCUS,
@@ -135,7 +135,6 @@ static char  Bot_sep,
              Bot_buf[BOTBUFSIZ];       // the 'environ' can be huge
 typedef int(*BOT_f)(const void *, const void *);
 static BOT_f Bot_focus_func;
-static void(*Bot_show_func)(void);
 
         /* This is really the number of lines needed to display the summary
            information (0 - nn), but is used as the relative row where we
@@ -252,14 +251,14 @@ static const char Osel_filterI_fmt[] = "\ttype=%d,\t" OSEL_FILTER "%*s\n";
         /* Support for adjoining display (if terminal is wide enough) */
 #ifdef TOG4_SEP_OFF
 static char Adjoin_sp[] =  "  ";
-#define ADJOIN_space  (sizeof(Adjoin_sp) - 1)    // 1 for null
+#define ADJOIN_space  ((int)(sizeof(Adjoin_sp) - 1))  // 1 for null
 #else
 #ifdef TOG4_SEP_STD
 static char Adjoin_sp[] =  "~1 ~6 ";
 #else
 static char Adjoin_sp[] =  " ~6 ~1";
 #endif
-#define ADJOIN_space  (sizeof(Adjoin_sp) - 5)    // 1 for null + 4 unprintable
+#define ADJOIN_space  ((int)(sizeof(Adjoin_sp) - 5))  // 1 for null + 4 unprintable
 #endif
 #define ADJOIN_limit  8
 
@@ -273,8 +272,10 @@ static enum pids_item *Pids_itms;           // allocated as MAXTBL(Fieldstab)
 static struct pids_fetch *Pids_reap;        // for reap or select
 #define PIDSmaxt Pids_reap->counts->total   // just a little less wordy
         // pid stack results extractor macro, where e=our EU enum, t=type, s=stack
-        // ( we'll exploit that <proc/pids.h> provided macro as much as possible )
-        // ( but many functions use their own unique tailored version for access )
+        // ( now we're just duplicating that pids.h provided VAL macro since the )
+        // ( 'info' parameter has been removed. however, we'll leave it in place )
+        // ( since many routines use their own unique version based on this one. )
+        // ( besides, all of our otther global VAL macros use the 3 byte prefix. )
 #define PID_VAL(e,t,s) PIDS_VAL(e, t, s)
         /*
          *  --- <proc/stat.h> -------------------------------------------------- */
@@ -286,7 +287,6 @@ static enum stat_item Stat_items[] = {
    STAT_TIC_DELTA_NICE,     STAT_TIC_DELTA_IDLE,
    STAT_TIC_DELTA_IOWAIT,   STAT_TIC_DELTA_IRQ,
    STAT_TIC_DELTA_SOFTIRQ,  STAT_TIC_DELTA_STOLEN,
-   STAT_TIC_DELTA_GUEST,    STAT_TIC_DELTA_GUEST_NICE,
    STAT_TIC_SUM_DELTA_USER, STAT_TIC_SUM_DELTA_SYSTEM,
 #ifdef CORE_TYPE_NO
    STAT_TIC_SUM_DELTA_TOTAL };
@@ -299,7 +299,6 @@ enum Rel_statitems {
    stat_NI, stat_IL,
    stat_IO, stat_IR,
    stat_SI, stat_ST,
-   stat_GU, stat_GN,
    stat_SUM_USR, stat_SUM_SYS,
 #ifdef CORE_TYPE_NO
    stat_SUM_TOT };
@@ -2032,20 +2031,22 @@ static struct {
 #define eu_CMDLINE     eu_LAST +1
 #define eu_TICS_ALL_C  eu_LAST +2
 #define eu_ID_FUID     eu_LAST +3
-#define eu_CMDLINE_V   eu_LAST +4
-#define eu_ENVIRON_V   eu_LAST +5
-#define eu_TREE_HID    eu_LAST +6
-#define eu_TREE_LVL    eu_LAST +7
-#define eu_TREE_ADD    eu_LAST +8
+#define eu_CAPABILITY  eu_LAST +4
+#define eu_CMDLINE_V   eu_LAST +5
+#define eu_ENVIRON_V   eu_LAST +6
+#define eu_TREE_HID    eu_LAST +7
+#define eu_TREE_LVL    eu_LAST +8
+#define eu_TREE_ADD    eu_LAST +9
 #define eu_RESET       eu_TREE_HID       // demarcation for reset to zero (PIDS_extra)
-   , {  -1, -1, -1,  PIDS_CMDLINE     }  // str      ( if Show_CMDLIN, eu_CMDLINE    )
-   , {  -1, -1, -1,  PIDS_TICS_ALL_C  }  // ull_int  ( if Show_CTIMES, eu_TICS_ALL_C )
-   , {  -1, -1, -1,  PIDS_ID_FUID     }  // u_int    ( if a usrseltyp, eu_ID_FUID    )
-   , {  -1, -1, -1,  PIDS_CMDLINE_V   }  // strv     ( if Ctrlk,       eu_CMDLINE_V  )
-   , {  -1, -1, -1,  PIDS_ENVIRON_V   }  // strv     ( if CtrlN,       eu_ENVIRON_V  )
-   , {  -1, -1, -1,  PIDS_extra       }  // s_ch     ( if Show_FOREST, eu_TREE_HID   )
-   , {  -1, -1, -1,  PIDS_extra       }  // s_int    ( if Show_FOREST, eu_TREE_LVL   )
-   , {  -1, -1, -1,  PIDS_extra       }  // s_int    ( if Show_FOREST, eu_TREE_ADD   )
+   , {  -1, -1, -1,  PIDS_CMDLINE        }  // str      ( if Show_CMDLIN, eu_CMDLINE    )
+   , {  -1, -1, -1,  PIDS_TICS_ALL_C     }  // ull_int  ( if Show_CTIMES, eu_TICS_ALL_C )
+   , {  -1, -1, -1,  PIDS_ID_FUID        }  // u_int    ( if a usrseltyp, eu_ID_FUID    )
+   , {  -1, -1, -1,  PIDS_CAPS_PERMITTED }  // str      ( if kbd_CtrlA,   eu_CAPABILITY )
+   , {  -1, -1, -1,  PIDS_CMDLINE_V      }  // strv     ( if kbd_CtrlK,   eu_CMDLINE_V  )
+   , {  -1, -1, -1,  PIDS_ENVIRON_V      }  // strv     ( if kbd_CtrlN,   eu_ENVIRON_V  )
+   , {  -1, -1, -1,  PIDS_extra          }  // s_ch     ( if Show_FOREST, eu_TREE_HID   )
+   , {  -1, -1, -1,  PIDS_extra          }  // s_int    ( if Show_FOREST, eu_TREE_LVL   )
+   , {  -1, -1, -1,  PIDS_extra          }  // s_int    ( if Show_FOREST, eu_TREE_ADD   )
  #undef A_left
  #undef A_right
 };
@@ -2271,7 +2272,7 @@ static void build_headers (void) {
          if (EU_CMD == f) ckCMDS(w);
          else ckITEM(f);
 
-         // lastly, accommodate any special non-display 'tagged' needs...
+         // lastly, accommodate any special 'bottom' window needs ...
          i = 0;
          while (Bot_item[i] > BOT_DELIMIT) {
             ckITEM(Bot_item[i]);
@@ -2661,7 +2662,7 @@ static void zap_fieldstab (void) {
       if (Cpu_cnt > 1000) {
          if (Cpu_pmax > 9999999.0) Cpu_pmax = 9999999.0;
       } else if (Cpu_cnt > 100) {
-         if (Cpu_cnt > 999999.0) Cpu_pmax = 999999.0;
+         if (Cpu_pmax > 999999.0) Cpu_pmax = 999999.0;
       } else if (Cpu_cnt > 10) {
          if (Cpu_pmax > 99999.0) Cpu_pmax = 99999.0;
       } else {
@@ -2838,14 +2839,16 @@ static void *tasks_refresh (void *unused) {
 #ifdef THREADED_TSK
       sem_wait(&Semaphore_tasks_beg);
 #endif
-      clock_gettime(CLOCK_BOOTTIME, &ts);
-      uptime_cur = (ts.tv_sec + ts.tv_nsec * 1.0e-9);
-      et = uptime_cur - uptime_sav;
-      if (et < 0.01) et = 0.005;
-      uptime_sav = uptime_cur;
-      // if in Solaris mode, adjust our scaling for all cpus
-      Frame_etscale = 100.0f / ((float)Hertz * (float)et * (Rc.mode_irixps ? 1 : Cpu_cnt));
-
+      if (0 != clock_gettime(CLOCK_BOOTTIME, &ts))
+         Frame_etscale = 0;
+      else {
+         uptime_cur = (ts.tv_sec + ts.tv_nsec * 1.0e-9);
+         et = uptime_cur - uptime_sav;
+         if (et < 0.01) et = 0.005;
+         uptime_sav = uptime_cur;
+         // if in Solaris mode, adjust our scaling for all cpus
+         Frame_etscale = 100.0f / ((float)Hertz * (float)et * (Rc.mode_irixps ? 1 : Cpu_cnt));
+      }
       what = Thread_mode ? PIDS_FETCH_THREADS_TOO : PIDS_FETCH_TASKS_ONLY;
       if (Monpidsidx) {
          what |= PIDS_SELECT_PID;
@@ -3887,9 +3890,8 @@ static void config_insp (FILE *fp, char *buf, size_t size) {
       int n, x;
       char *s1, *s2, *s3;
 
-      if (i < 0 || (size_t)i >= INT_MAX / sizeof(struct I_ent)) break;
-      if (lraw >= INT_MAX - size) break;
-
+      if (i < 0 || (size_t)i >= (size_t)INT_MAX / sizeof(struct I_ent)) break;
+      if (lraw >= (size_t)INT_MAX - size) break;
       if (!buf[0] && !fgets(buf, size, fp)) break;
       lraw += strlen(buf) +1;
       Inspect.raw = alloc_r(Inspect.raw, lraw);
@@ -4258,6 +4260,8 @@ system_default:
          p = configs_file(fp, SYS_RCDEFAULTS, &tmp_delay);
          fclose(fp);
          if (p) goto default_or_error;
+         // as this file ages, suppress the compatibility warning ...
+         Rc_compatibilty = 0;
       }
    }
 
@@ -5149,7 +5153,7 @@ static int bot_focus_str (const char *hdr, const char *str) {
    char tmp[BIGBUFSIZ];
    int n, x;
 
-   if (str) {
+   if (hdr) {
       // we're a little careless with overhead here (it's a one time cost)
       memset(Bot_buf, '\0', sizeof(Bot_buf));
       n = strlen(str);
@@ -5199,7 +5203,7 @@ static int bot_focus_strv (const char *hdr, const char **strv) {
    char tmp[SCREENMAX], *p;
    int i, n, x;
 
-   if (strv) {
+   if (hdr) {
       // we're a little careless with overhead here (it's a one time cost)
       memset(Bot_buf, '\0', sizeof(Bot_buf));
       n = (char *)&strv[0] - strv[0];
@@ -5291,6 +5295,9 @@ static void *bot_item_hlp (struct pids_stack *p) {
       case eu_CMDLINE_V:
       case eu_ENVIRON_V:
          return p->head[Bot_item[0]].result.strv;
+      case eu_CAPABILITY:
+         procps_capmask_names(buf, sizeof(buf), PID_VAL(eu_CAPABILITY, str, p));
+         return buf;
       default:
          return p->head[Bot_item[0]].result.str;
    }
@@ -5354,11 +5361,11 @@ static void bot_item_toggle (int what, const char *head, char sep) {
             Bot_focus_func = (BOT_f)bot_focus_str;
             break;
       }
-      Bot_sep = sep;
+      Bot_new  = 1;
+      Bot_sep  = sep;
       Bot_what = what;
       Bot_indx = BOT_UNFOCUS;
       Bot_head = (char *)head;
-      Bot_show_func = bot_item_show;
       Bot_task = PID_VAL(EU_PID, s_int, Curwin->ppt[Curwin->begtask]);
    }
 } // end: bot_item_toggle
@@ -5603,6 +5610,59 @@ static void write_rcfile (void) {
    *  These routines exist just to keep the do_key() function
    *  a reasonably modest size. */
 
+static void keys_bottom (int ch) {
+   int max_indx;
+
+   switch (ch) {
+      case kbd_CtrlA:
+         bot_item_toggle(eu_CAPABILITY, N_fmt(X_BOT_capprm_fmt), BOT_SEP_CMA);
+         break;
+      case kbd_CtrlG:
+         bot_item_toggle(EU_CGR, N_fmt(X_BOT_ctlgrp_fmt), BOT_SEP_SLS);
+         break;
+      case kbd_CtrlK:
+         // with string vectors, the 'separator' may serve a different purpose
+         bot_item_toggle(eu_CMDLINE_V, N_fmt(X_BOT_cmdlin_fmt), BOT_SEP_SPC);
+         break;
+      case kbd_CtrlL:
+         bot_item_toggle(BOT_MSG_LOG, N_txt(X_BOT_msglog_txt), BOT_SEP_SMI);
+         break;
+      case kbd_CtrlN:
+         // with string vectors, the 'separator' may serve a different purpose
+         bot_item_toggle(eu_ENVIRON_V, N_fmt(X_BOT_envirn_fmt), BOT_SEP_SPC);
+         break;
+      case kbd_CtrlP:
+         bot_item_toggle(BOT_ITEM_NS, N_fmt(X_BOT_namesp_fmt), BOT_SEP_CMA);
+         break;
+      case kbd_CtrlU:
+         bot_item_toggle(EU_SGN, N_fmt(X_BOT_supgrp_fmt), BOT_SEP_CMA);
+         break;
+      case kbd_TAB:
+         if (BOT_PRESENT) {
+            // account for a change of toggles or a change of direction ...
+            max_indx = Bot_focus_func(NULL, NULL);
+            if (Bot_indx > max_indx) Bot_indx = BOT_UNFOCUS;
+            ++Bot_indx;
+            if (Bot_indx > max_indx) Bot_indx = BOT_UNFOCUS;
+            Bot_focus_func(NULL, NULL);
+         }
+         break;
+      case kbd_BTAB:
+         if (BOT_PRESENT) {
+            // account for a change of toggles or a change of direction ...
+            max_indx = Bot_focus_func(NULL, NULL);
+            if (Bot_indx <= BOT_UNFOCUS) Bot_indx = max_indx + 1;
+            --Bot_indx;
+            if (Bot_indx <= BOT_UNFOCUS) Bot_indx = max_indx + 1;
+            Bot_focus_func(NULL, NULL);
+         }
+         break;
+      default:                    // keep gcc happy
+         break;
+   }
+} // end: keys_bottom
+
+
 static void keys_global (int ch) {
    WIN_t *w = Curwin;             // avoid gcc bloat with a local copy
    int i, num, def, pid;
@@ -5732,30 +5792,6 @@ static void keys_global (int ch) {
             Rc.tics_scaled = 0;
 #endif
          break;
-      case kbd_CtrlG:
-         bot_item_toggle(EU_CGR, N_fmt(X_BOT_ctlgrp_fmt), BOT_SEP_SLS);
-         break;
-      case kbd_CtrlI:
-         if (BOT_PRESENT) {
-            ++Bot_indx;
-            if (Bot_indx > Bot_focus_func(NULL, NULL))
-               Bot_indx = BOT_UNFOCUS;
-         }
-         break;
-      case kbd_CtrlK:
-         // with string vectors, the 'separator' may serve a different purpose
-         bot_item_toggle(eu_CMDLINE_V, N_fmt(X_BOT_cmdlin_fmt), BOT_SEP_SPC);
-         break;
-      case kbd_CtrlL:
-         bot_item_toggle(BOT_MSG_LOG, N_txt(X_BOT_msglog_txt), BOT_SEP_SMI);
-         break;
-      case kbd_CtrlN:
-         // with string vectors, the 'separator' may serve a different purpose
-         bot_item_toggle(eu_ENVIRON_V, N_fmt(X_BOT_envirn_fmt), BOT_SEP_SPC);
-         break;
-      case kbd_CtrlP:
-         bot_item_toggle(BOT_ITEM_NS, N_fmt(X_BOT_namesp_fmt), BOT_SEP_CMA);
-         break;
       case kbd_CtrlR:
          if (Secure_mode)
             show_msg(N_txt(NOT_onsecure_txt));
@@ -5780,17 +5816,6 @@ static void keys_global (int ch) {
                   }
                }
             }
-         }
-         break;
-      case kbd_CtrlU:
-         bot_item_toggle(EU_SGN, N_fmt(X_BOT_supgrp_fmt), BOT_SEP_CMA);
-         break;
-      case kbd_BTAB:
-         if (BOT_PRESENT) {
-            --Bot_indx;
-            num = Bot_focus_func(NULL, NULL);
-            if (Bot_indx <= BOT_UNFOCUS)
-               Bot_indx = num + 1;
          }
          break;
       case kbd_ENTER:             // these two have the effect of waking us
@@ -6408,11 +6433,6 @@ static int sum_tics (struct stat_stack *this, const char *pfx, int nobuf) {
    if (1 > tot_frme) idl_frme = tot_frme = 1;
    scale = 100.0 / (float)tot_frme;
 
-   /* account for VM tics not otherwise provided for ...
-      ( with xtra-procps-debug.h, can't use PID_VAL w/ assignment ) */
-   this->head[stat_SY].result.sl_int += rSv(stat_GU) + rSv(stat_GN);
-   this->head[stat_SUM_SYS].result.sl_int += rSv(stat_GU) + rSv(stat_GN);
-
    /* display some kinda' cpu state percentages
       (who or what is explained by the passed prefix) */
    if (Curwin->rc.graph_cpus) {
@@ -6462,8 +6482,6 @@ static int sum_unify (struct stat_stack *this, int nobuf) {
    stack[stat_IR].result.sl_int += rSv(stat_IR, sl_int);
    stack[stat_SI].result.sl_int += rSv(stat_SI, sl_int);
    stack[stat_ST].result.sl_int += rSv(stat_ST, sl_int);
-   stack[stat_GU].result.sl_int += rSv(stat_GU, sl_int);
-   stack[stat_GN].result.sl_int += rSv(stat_GN, sl_int);
    stack[stat_SUM_USR].result.sl_int += rSv(stat_SUM_USR, sl_int);
    stack[stat_SUM_SYS].result.sl_int += rSv(stat_SUM_SYS, sl_int);
    stack[stat_SUM_TOT].result.sl_int += rSv(stat_SUM_TOT, sl_int);
@@ -6723,12 +6741,13 @@ static void do_key (int ch) {
       void (*func)(int ch);
       char keys[SMLBUFSIZ];
    } key_tab[] = {
+      { keys_bottom,
+         { kbd_CtrlA, kbd_CtrlG, kbd_CtrlK, kbd_CtrlL, kbd_CtrlN
+         , kbd_CtrlP, kbd_CtrlU, kbd_TAB, kbd_BTAB, '\0' } },
       { keys_global,
          { '?', 'B', 'd', 'E', 'e', 'f', 'g', 'H', 'h'
          , 'I', 'k', 'r', 's', 'X', 'Y', 'Z', '0'
-         , kbd_CtrlE, kbd_CtrlG, kbd_CtrlI, kbd_CtrlK, kbd_CtrlL
-         , kbd_CtrlN, kbd_CtrlP, kbd_CtrlR, kbd_CtrlU
-         , kbd_ENTER, kbd_SPACE, kbd_BTAB, '\0' } },
+         , kbd_CtrlE, kbd_CtrlR, kbd_ENTER, kbd_SPACE, '\0' } },
       { keys_summary,
  #ifdef CORE_TYPE_NO
          { '!', '1', '2', '3', '4', 'C', 'l', 'm', 't', '\0' } },
@@ -6974,7 +6993,7 @@ static const char *task_show (const WIN_t *q, int idx) {
             else
                cp = make_num(rSv(EU_PRI, s_int), W, Jn, AUTOX_NO, 0);
             break;
-   /* s_int, scale_pcnt with special handling */
+   /* u_int, scale_pcnt with special handling */
          case EU_CPU:        // PIDS_TICS_ALL_DELTA
          {  float u = (float)rSv(EU_CPU, u_int);
             int n = rSv(EU_THD, s_int);
@@ -7405,7 +7424,7 @@ static void frame_make (void) {
    }
 
    if (CHKw(w, View_SCROLL) && VIZISw(Curwin)) show_scroll();
-   if (Bot_show_func) Bot_show_func();
+   if (Bot_new) bot_item_show();
    fflush(stdout);
 
    /* we'll deem any terminal not supporting tgoto as dumb and disable

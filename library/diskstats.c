@@ -1,8 +1,8 @@
 /*
  * diskstats.c - disk I/O related definitions for libproc2
  *
+ * Copyright © 2015-2024 Jim Warner <james.warner@comcast.net>
  * Copyright © 2015-2023 Craig Small <csmall@dropbear.xyz>
- * Copyright © 2015-2023 Jim Warner <james.warner@comcast.net>
  * Copyright © 2003      Albert Cahalan
  * Copyright © 2003      Fabian Frederick
  *
@@ -520,9 +520,17 @@ static int diskstats_read_failed (
     if (!info->diskstats_fp
     && (!(info->diskstats_fp = fopen(DISKSTATS_FILE, "r"))))
         return 1;
-
-    if (fseek(info->diskstats_fp, 0L, SEEK_SET) == -1)
-        return 1;
+    else {
+        if (-1 == fseek(info->diskstats_fp, 0L, SEEK_SET)) {
+            /* a concession to libvirt lxc support, which has been
+               known to treat a /proc file as non-seekable ... */
+            if (ESPIPE != errno)
+                return 1;
+            fclose(info->diskstats_fp);
+            if (!(info->diskstats_fp = fopen(DISKSTATS_FILE, "r")))
+                return 1;
+        }
+    }
 
     info->old_stamp = info->new_stamp;
     info->new_stamp = time(NULL);

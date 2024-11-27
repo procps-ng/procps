@@ -1,5 +1,5 @@
 .\"
-.\" Copyright (c) 2011-2023 Craig Small <csmall@dropbear.xyz>
+.\" Copyright (c) 2011-2024 Craig Small <csmall@dropbear.xyz>
 .\" Copyright (c) 2011-2012 Sami Kerola <kerolasa@iki.fi>
 .\" Copyright (c) 2002-2006 Albert Cahalan
 .\"
@@ -9,7 +9,7 @@
 .\" (at your option) any later version.
 .\"
 .\"
-.TH SKILL 1 "2023-08-19" "procps-ng" "User Commands"
+.TH SKILL 1 2024-08-01 procps-ng
 .SH NAME
 skill, snice \- send a signal or report process status
 .SH SYNOPSIS
@@ -63,31 +63,31 @@ Verbose; explain what is being done.
 .BR \-w , \ \-\-warnings
 Enable warnings.  This option has not been implemented.
 .TP
-\fB\-h\fR, \fB\-\-help\fR
+.BR \-h , \ \-\-help
 Display help text and exit.
 .TP
-\fB\-V\fR, \fB\-\-version\fR
+.BR \-V , \ \-\-version
 Display version information.
 .SH "PROCESS SELECTION OPTIONS"
 Selection criteria can be: terminal, user, pid, command.  The options
 below may be used to ensure correct interpretation.
 .TP
-\fB\-t\fR, \fB\-\-tty\fR \fItty\fR
+.BI \-t \ tty\fR,\  \-\-tty \ tty
 The next expression is a terminal (tty or pty).
 .TP
-\fB\-u\fR, \fB\-\-user\fR \fIuser\fR
+.BI \-u \ user\fR,\  \-\-user \ user
 The next expression is a username.
 .TP
-\fB\-p\fR, \fB\-\-pid\fR \fIpid\fR
+.BI \-p \ pid\fR,\  \-\-pid \ pid
 The next expression is a process ID number.
 .TP
-\fB\-c\fR, \fB\-\-command\fR \fIcommand\fR
+.BI \-c \ command\fR,\  \-\-command \ command
 The next expression is a command name.
 .TP
-\fB\-\-ns \fIpid\fR
+.BI \-\-ns \ pid
 Match the processes that belong to the same namespace as pid.
 .TP
-\fB\-\-nslist \fIns\/\fR,\,\fI.\|.\|.\/\fR
+.RI \fB\-\-nslist \ ns , .\|.\|.
 list which namespaces will be considered for the \fB\-\-ns\fP option.
 Available namespaces: ipc, mnt, net, pid, user, uts.
 .SH SIGNALS
@@ -97,7 +97,7 @@ manual page.
 .SH EXAMPLES
 .TP
 .B snice \-c seti \-c crack +7
-+Slow down \fBseti\fP and \fBcrack\fP commands.
+Slow down \fBseti\fP and \fBcrack\fP commands.
 .TP
 .B skill \-KILL \-t /dev/pts/*
 Kill users on PTY devices.

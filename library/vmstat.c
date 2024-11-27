@@ -1,7 +1,7 @@
 /*
  * vmstat.c - virtual memory related definitions for libproc2
  *
- * Copyright © 2015-2023 Jim Warner <james.warner@comcast.net>
+ * Copyright © 2015-2024 Jim Warner <james.warner@comcast.net>
  * Copyright © 2015-2023 Craig Small <csmall@dropbear.xyz>
  * Copyright © 2003      Albert Cahalan
  * Copyright © 1996      Charles Blake <cblake@bbn.com>
@@ -985,14 +985,14 @@ static int vmstat_make_hash_failed (
         struct vmstat_info *info)
 {
  #define htVAL(f) e.key = STRINGIFY(f); e.data = &info->hist.new. f; \
-  if (!hsearch_r(e, ENTER, &ep, &info->hashtab)) return 1;
+  if (!hsearch_r(e, ENTER, &ep, &info->hashtab)) goto err_return;
     ENTRY e, *ep;
     size_t n;
 
     n = sizeof(struct vmstat_data) / sizeof(unsigned long);
     // we'll follow the hsearch recommendation of an extra 25%
     if (!hcreate_r(n + (n / 4), &info->hashtab))
-        return 1;
+        goto err_return;
 
     htVAL(allocstall_dma)
     htVAL(allocstall_dma32)
@@ -1147,6 +1147,8 @@ static int vmstat_make_hash_failed (
     htVAL(zone_reclaim_failed)
 
     return 0;
+ err_return:
+    return 1;
  #undef htVAL
 } // end: vmstat_make_hash_failed
 
@@ -1174,9 +1176,17 @@ static int vmstat_read_failed (
     if (-1 == info->vmstat_fd
     && (-1 == (info->vmstat_fd = open(VMSTAT_FILE, O_RDONLY))))
         return 1;
-
-    if (lseek(info->vmstat_fd, 0L, SEEK_SET) == -1)
-        return 1;
+    else {
+        if (-1 == lseek(info->vmstat_fd, 0L, SEEK_SET)) {
+            /* a concession to libvirt lxc support, which has been
+               known to treat a /proc file as non-seekable ... */
+            if (ESPIPE != errno)
+                return 1;
+            close(info->vmstat_fd);
+            if (-1 == (info->vmstat_fd = open(VMSTAT_FILE, O_RDONLY)))
+                return 1;
+        }
+    }
 
     for (;;) {
         if ((size = read(info->vmstat_fd, buf, sizeof(buf)-1)) < 0) {

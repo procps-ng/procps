@@ -564,12 +564,14 @@ static void showinfo(
         char *sd_tty;
 
         if (sd_session_get_tty(session, &sd_tty) >= 0) {
-            for (i = 0; i < strlen (sd_tty); i++)
+	    for (i = 0; i < UT_LINESIZE; i++) {
+		if (sd_tty[i] == '\0') break;
                 /* clean up tty if garbled */
 	        if (isalnum(sd_tty[i]) || (sd_tty[i] == '/'))
 		    tty[i + 5] = sd_tty[i];
 		else
 		    tty[i + 5] = '\0';
+	    }
 	    free(sd_tty);
 	}
     } else {
@@ -630,8 +632,10 @@ static void showinfo(
     if (u && *u->ut_line == ':')
         /* idle unknown for xdm logins */
         printf(" ?xdm? ");
-    else
+    else if (tty[5])
         print_time_ival7(idletime(tty), 0, stdout);
+    else
+	printf("       ");
 
     /* jpcpu/pcpu */
     if (longform) {
@@ -844,9 +848,15 @@ int main(int argc, char **argv)
 		int i;
 
 		for (int i = 0; i < sessions; i++) {
-			char *name;
+			char *class, *name;
 			int r;
 
+			if ((r = sd_session_get_class(sessions_list[i], &class)) < 0)
+				error(EXIT_FAILURE, -r, _("session get class failed"));
+                        if (strncmp(class, "user", 4) != 0) { // user, user-early, user-incomplete
+                                free(class);
+                                continue;
+                        }
 			if ((r = sd_session_get_username(sessions_list[i], &name)) < 0)
 				error(EXIT_FAILURE, -r, _("get user name failed"));
 
@@ -855,6 +865,7 @@ int main(int argc, char **argv)
 					from, userlen, fromlen, ip_addresses, pids,
 					pids_cache);
 
+			free(class);
 			free(name);
 			free(sessions_list[i]);
 		}

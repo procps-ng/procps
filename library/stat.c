@@ -1,7 +1,7 @@
 /*
  * stat.c - cpu/numa related definitions for libproc2
  *
- * Copyright © 2015-2023 Jim Warner <james.warner@comcast.net>
+ * Copyright © 2015-2024 Jim Warner <james.warner@comcast.net>
  * Copyright © 2015-2023 Craig Small <csmall@dropbear.xyz>
  *
  * This library is free software; you can redistribute it and/or
@@ -572,11 +572,15 @@ static inline void stat_derive_unique (
     this->new.xidl
         = this->new.idle
         + this->new.iowait;
+    /* note: we exclude guest tics from xtot since ...
+             'user' already includes 'guest'
+             'nice' already includes 'gnice'
+       ( see linux sources: ./kernel/sched/cputime.c, kcpustat_cpu_fetch ) */
     this->new.xtot
-        = this->new.xusr + this->new.xsys + this->new.xidl
-        + this->new.stolen
-        + this->new.guest
-        + this->new.gnice;
+        = this->new.xusr
+        + this->new.xsys
+        + this->new.xidl
+        + this->new.stolen;
     this->new.xbsy
         = this->new.xtot - this->new.xidl;
 
@@ -728,8 +732,10 @@ static int stat_read_failed (
     if (!info->stat_fp
     && (!(info->stat_fp = fopen(STAT_FILE, "r"))))
         return 1;
-    fflush(info->stat_fp);
-    rewind(info->stat_fp);
+    else {
+        fflush(info->stat_fp);
+        rewind(info->stat_fp);
+    }
 
  #define maxSIZ    info->stat_buf_size
  #define curSIZ  ( maxSIZ - tot_read )

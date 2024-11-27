@@ -1,6 +1,6 @@
 /* top_nls.c - provide the basis for future nls translations */
 /*
- * Copyright © 2011-2023 Jim Warner <james.warner@comcast.net
+ * Copyright © 2011-2024 Jim Warner <james.warner@comcast.net
  *
  * This file may be used subject to the terms and conditions of the
  * GNU Library General Public License Version 2, or any later version
@@ -28,24 +28,6 @@
 #include <stdlib.h>
 #endif
 
-
-        /*
-         * The provision excluding some strings is intended to be
-         * used very sparingly. It exists in case we collide with
-         * some translation project person in a position to delay
-         * a future release over his or her personal preferences.
-         *
-         * If it's ever enabled, it will produce a fatal compiler
-         * error as our only option since those gettext tools are
-         * far too primitive to be influenced with a conditional.
-         * They always ignore a '_X()' macro no matter its state. */
-
-#ifndef NLS_INCLUDED
-# define _X(str)  (str)
-#else
-# define _X(str)
-# error instead of this #define, restore the true gettext macro(s)
-#endif
 
         // Programmer Note(s):
         //  Preparation ---------------------------------------------
@@ -418,7 +400,12 @@ static void build_norm_nlstab (void) {
    Norm_nlstab[EXIT_signals_fmt] = _(""
       "\tsignal %d (%s) was caught by %s, please\n"
       "\tsend bug reports to <procps@freelists.org>\n");
-   Norm_nlstab[HELP_cmdline_fmt] = _X("\n"
+/* Translation Hint:
+   . The following help text has been right-justified as an English only
+   . exercise. There is absolutely no requirement that your translations
+   . need conform to such a convention.
+   . */
+   Norm_nlstab[HELP_cmdline_fmt] = _("\n"
       "Usage:\n"
       " %s [options]\n"
       "\n"
@@ -616,6 +603,7 @@ static void build_norm_nlstab (void) {
    Norm_nlstab[AGNI_invalid_txt] = _("valid AGNI range is -20 to +19");
    Norm_nlstab[AGNI_notopen_fmt] = _("autogroup open failed, %s");
    Norm_nlstab[AGNI_nowrite_fmt] = _("autogroup write failed, %s");
+   Norm_nlstab[X_BOT_capprm_fmt] = _("permitted capabilities for pid %d, %s");
    Norm_nlstab[X_BOT_cmdlin_fmt] = _("command line for pid %d, %s");
    Norm_nlstab[X_BOT_ctlgrp_fmt] = _("control groups for pid %d, %s");
    Norm_nlstab[X_BOT_envirn_fmt] = _("environment for pid %d, %s");

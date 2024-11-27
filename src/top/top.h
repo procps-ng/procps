@@ -1,6 +1,6 @@
 /* top.h - Header file:         show Linux processes */
 /*
- * Copyright © 2002-2023 Jim Warner <james.warner@comcast.net
+ * Copyright © 2002-2024 Jim Warner <james.warner@comcast.net
  *
  * This file may be used subject to the terms and conditions of the
  * GNU Library General Public License Version 2, or any later version
@@ -42,7 +42,6 @@
 //#define INSP_SAVEBUF            /* preserve 'Insp_buf' contents via a file */
 //#define INSP_SLIDE_1            /* when scrolling left/right, don't move 8 */
 //#define MEMGRAPH_OLD            /* don't use 'available' when graphing Mem */
-//#define NLS_INCLUDED            /* provides for excluding from translation */
 //#define NLS_VALIDATE            /* ensure the integrity of four nls tables */
 //#define OFF_SCROLLBK            /* disable tty emulators scrollback buffer */
 //#define OFF_STDERROR            /* disable our stderr buffering (redirect) */
@@ -168,6 +167,7 @@ char *strcasestr(const char *haystack, const char *needle);
 #define kbd_ESC    '\033'
 #define kbd_SPACE  ' '
 #define kbd_ENTER  '\n'
+#define kbd_TAB    '\t'
 #define kbd_UP     129
 #define kbd_DOWN   130
 #define kbd_LEFT   131
@@ -180,9 +180,9 @@ char *strcasestr(const char *haystack, const char *needle);
 #define kbd_INS    138
 #define kbd_DEL    139
 #define kbd_BTAB   140
+#define kbd_CtrlA  '\001'
 #define kbd_CtrlE  '\005'
 #define kbd_CtrlG  '\007'
-#define kbd_CtrlI  '\011'
 #define kbd_CtrlK  '\013'
 #define kbd_CtrlL  '\014'
 #define kbd_CtrlN  '\016'
@@ -304,10 +304,10 @@ typedef          long long SIC_t;
 #else
 #define DEF_WINFLGS ( View_LOADAV | View_STATES | View_MEMORY | Show_CMDLIN \
    | Show_COLORS | Show_FOREST | Show_HIROWS | Show_IDLEPS | Show_JRNUMS | Show_TASKON \
-   | Qsrt_NORMAL )
+   | Show_HIBOLD | Qsrt_NORMAL )
 #define DEF_GRAPHS2  2, 2
 #define DEF_SCALES2  SK_Gb, SK_Mb
-#define ALT_WINFLGS (DEF_WINFLGS | Show_HIBOLD) & ~Show_FOREST
+#define ALT_WINFLGS DEF_WINFLGS & ~Show_FOREST
 #define ALT_GRAPHS2  1, 1
 #endif
 
@@ -768,6 +768,7 @@ typedef struct WIN_t {
 //atic void          other_filters (int ch);
 //atic void          write_rcfile (void);
 /*------  Interactive Input Secondary support (do_key helpers)  ----------*/
+//atic void          keys_bottom (int ch);
 //atic void          keys_global (int ch);
 //atic void          keys_summary (int ch);
 //atic void          keys_task (int ch);

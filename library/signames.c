@@ -1,7 +1,7 @@
 /*
- * signames.c - ps signal names
+ * signames.c - Translate signal masks
  *
- * Copyright © 2023      Craig Small <csmall@dropbear.xyz>
+ * Copyright © 2023-2024 Craig Small <csmall@dropbear.xyz>
  * Copyright © 2020      Luis Chamberlain <mcgrof@kernel.org>
  *
  * This library is free software; you can redistribute it and/or
@@ -38,8 +38,9 @@
 #include <sys/stat.h>
 #include <sys/utsname.h>
 
-#include "common.h"
 #include "signals.h"
+#include "misc.h"
+#include "procps-private.h"
 
 /* For libraries like musl */
 #ifndef __SIGRTMIN
@@ -59,6 +60,61 @@
  * specific.
  */
 
+#if !HAVE_SIGABBREV_NP
+static inline const char *sigabbrev_np(int sig)
+{
+#define SIGABBREV(a_) case SIG##a_: return #a_
+    switch(sig) {
+        SIGABBREV(HUP);
+        SIGABBREV(INT);
+        SIGABBREV(QUIT);
+        SIGABBREV(ILL);
+        SIGABBREV(TRAP);
+        SIGABBREV(ABRT);
+        SIGABBREV(BUS);
+        SIGABBREV(FPE);
+        SIGABBREV(KILL);
+        SIGABBREV(USR1);
+        SIGABBREV(SEGV);
+        SIGABBREV(USR2);
+        SIGABBREV(PIPE);
+        SIGABBREV(ALRM);
+        SIGABBREV(TERM);
+#ifdef SIGSTKFLT
+        SIGABBREV(STKFLT);
+#endif
+        SIGABBREV(CHLD);
+        SIGABBREV(CONT);
+        SIGABBREV(STOP);
+        SIGABBREV(TSTP);
+        SIGABBREV(TTIN);
+        SIGABBREV(TTOU);
+        SIGABBREV(URG);
+        SIGABBREV(XCPU);
+        SIGABBREV(XFSZ);
+        SIGABBREV(VTALRM);
+        SIGABBREV(PROF);
+        SIGABBREV(WINCH);
+        SIGABBREV(POLL);
+#ifdef SIGPWR               // absent in kFreeBSD (Debian #832148)
+        SIGABBREV(PWR);
+#endif
+        SIGABBREV(SYS);
+#ifdef SIGLOST              // Hurd (gitlab#93)
+        SIGABBREV(LOST);
+#endif
+#if defined __sun || defined __SUN || defined __solaris__ || defined __SOLARIS__
+        case 0: return "EXIT";
+#endif
+#if defined _AIX || defined __AIX__ || defined __aix__
+        case 0: return "NULL";
+#endif
+    };
+#undef SIGABBREV
+    return NULL;
+}
+
+#endif /* HAVE_SIGABBREV_NP */
 /*
  * As per glibc:
  *
@@ -87,11 +143,8 @@ static const char *sigstat_strsignal_abbrev(int sig, char *abbrev, size_t len)
 	 */
 	if (sig < __SIGRTMIN) {
                 const char *signame = NULL;
-#ifdef HAVE_SIGABBREV_NP
                 signame = sigabbrev_np(sig);
-#else
-                signame = signal_number_to_name(sig);
-#endif /* HAVE_SIGABBREV_NP */
+
                 if (signame != NULL && signame[0] != '\0') {
                     strncpy(abbrev, signame, len);
                     return abbrev;
@@ -130,42 +183,47 @@ static uint64_t mask_sig_val_num(int signum)
 	return ((uint64_t) 1 << (signum -1));
 }
 
-int print_signame(char *restrict const outbuf, const char *restrict const sig, const size_t len_in)
+PROCPS_EXPORT int procps_sigmask_names(
+        char *str,
+        size_t size,
+        const char *sigmask)
 {
 	unsigned int i;
 	char abbrev[SIGNAME_MAX];
 	unsigned int n = 0;
-	char *c = outbuf;
-        size_t len = len_in;
+	char *c = str;
 	uint64_t mask, mask_in;
 	uint64_t test_val = 0;
 
-        if (1 != sscanf(sig, "%" PRIu64, &mask_in))
-            return 0;
+        if (str == NULL || sigmask == NULL || size == 0)
+            return -EINVAL;
+
+        if (1 != sscanf(sigmask, "%" PRIx64, &mask_in))
+            return -EINVAL;
         mask = mask_in;
 
-	for (i=1; i < NSIG; i++) {
+	for (i=0; i < NSIG; i++) {
 		test_val = mask_sig_val_num(i);
 		if (test_val & mask) {
                         n = strlen(sigstat_strsignal_abbrev(i, abbrev, SIGNAME_MAX));
-                        if (n+1 >= len) { // +1 for the '+'
+                        if (n+1 >= size) { // +1 for the '+'
                             strcpy(c, "+");
-                            len -= 1;
+                            size -= 1;
                             c += 1;
                             break;
                         } else {
-			    n = snprintf(c, len, (c==outbuf)?"%s":",%s",
+			    n = snprintf(c, size, (c==str)?"%s":",%s",
 				     sigstat_strsignal_abbrev(i, abbrev,
 					   		      SIGNAME_MAX));
-			    len -= n;
+			    size -= n;
 			    c+=n;
                         }
 		}
 	}
-        if (c == outbuf) {
-            n = snprintf(c, len, "%c", '-');
-            len -= n;
+        if (c == str) {
+            n = snprintf(c, size, "%c", '-');
+            size -= n;
             c += n;
         }
-	return (int) (c-outbuf);
+	return (int) (c-str);
 }
