@@ -222,7 +222,6 @@ PROCPS_EXPORT int procps_sigmask_names(
 	}
         if (c == str) {
             n = snprintf(c, size, "%c", '-');
-            size -= n;
             c += n;
         }
 	return (int) (c-str);

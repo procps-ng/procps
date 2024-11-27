@@ -834,6 +834,7 @@ static char **file2strvec(const char *directory, const char *what) {
         }
     }
     *q = 0;                                     /* null ptr list terminator */
+    free(rbuf);
     return ret;
 }
 

@@ -1038,7 +1038,6 @@ setREL1(VM_RSS)
 static int pr_pmem(char *restrict const outbuf, const proc_t *restrict const pp){
   unsigned long pmem;
 setREL1(VM_RSS)
-  pmem = 0;
   pmem = rSv(VM_RSS, ul_int, pp) * 1000ULL / memory_total();
   if (pmem > 999) pmem = 999;
   return snprintf(outbuf, COLWID, "%2u.%u", (unsigned)(pmem/10), (unsigned)(pmem%10));

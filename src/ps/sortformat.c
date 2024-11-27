@@ -163,8 +163,10 @@ static const char *aix_format_parse(sf_node *sfn){
     if(*walk == '%'){
       const aix_struct *aix;
       walk++;
-      if(*walk == '%')
+      if(*walk == '%') {
+        free(buf);
         return _("missing AIX field descriptor");
+      }
       aix = search_aix_array(*walk);
       walk++;
       if(!aix){

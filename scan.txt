@@ -1,0 +1,339 @@
+Making all in po
+make[2]: Entering directory '/procps/po'
+make[2]: Nothing to be done for 'all'.
+make[2]: Leaving directory '/procps/po'
+Making all in testsuite
+make[2]: Entering directory '/procps/testsuite'
+  CC       ps.test/test-schedbatch.o
+  CCLD     test-schedbatch
+  CC       ps.test/test-hugetlb.o
+  CCLD     test-hugetlb
+  CC       ps.test/test-zombie.o
+  CCLD     test-zombie
+make[2]: Leaving directory '/procps/testsuite'
+make[2]: Entering directory '/procps'
+  CC       src/ps/display.o
+  CC       src/ps/global.o
+  CC       src/ps/help.o
+  CC       src/ps/output.o
+src/ps/output.c:490:3: warning: Value stored to 'endp' is never read [deadcode.DeadStores]
+  490 |   endp += escape_str(endp, rSv(CMD, str, pp), OUTBUF_SIZE_AT(endp), &rightward);
+      |   ^       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/ps/output.c:1041:3: warning: Value stored to 'pmem' is never read [deadcode.DeadStores]
+ 1041 |   pmem = 0;
+      |   ^      ~
+src/ps/output.c:1042:44: warning: Division by zero [core.DivideZero]
+ 1042 |   pmem = rSv(VM_RSS, ul_int, pp) * 1000ULL / memory_total();
+      |          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~
+3 warnings generated.
+  CC       src/ps/parser.o
+src/ps/parser.c:1079:20: warning: Potential leak of memory pointed to by 'pidnode' [unix.Malloc]
+ 1079 |     if(err) return err;     /* the node gets freed with the list */
+      |                    ^~~
+src/ps/parser.c:1079:20: warning: Potential leak of memory pointed to by 'grpnode' [unix.Malloc]
+ 1079 |     if(err) return err;     /* the node gets freed with the list */
+      |                    ^~~
+src/ps/parser.c:1079:20: warning: Potential leak of memory pointed to by 'sidnode' [unix.Malloc]
+ 1079 |     if(err) return err;     /* the node gets freed with the list */
+      |                    ^~~
+3 warnings generated.
+  CC       src/ps/select.o
+  CC       src/ps/sortformat.o
+src/ps/sortformat.c:116:23: warning: Access to field 'next' results in a dereference of a null pointer (loaded from variable 'endp') [core.NullDereference]
+  116 |   endp = fnode; while(endp->next) endp = endp->next;  /* find end */
+      |                       ^~~~~~~~~~
+src/ps/sortformat.c:167:16: warning: Potential leak of memory pointed to by 'buf' [unix.Malloc]
+  167 |         return _("missing AIX field descriptor");
+      |                ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./local/nls.h:25:18: note: expanded from macro '_'
+   25 | # define _(Text) gettext (Text)
+      |                  ^~~~~~~~~~~~~~
+/usr/include/libintl.h:109:25: note: expanded from macro 'gettext'
+  109 | # define gettext(msgid) dgettext (NULL, msgid)
+      |                         ^~~~~~~~~~~~~~~~~~~~~~
+/usr/include/libintl.h:112:3: note: expanded from macro 'dgettext'
+  112 |   dcgettext (domainname, msgid, LC_MESSAGES)
+      |   ^~~~~~~~~
+src/ps/sortformat.c:564:3: warning: Undefined or garbage value returned to caller [core.uninitialized.UndefReturn]
+  564 |   return err; /* could be NULL */
+      |   ^~~~~~~~~~
+src/ps/sortformat.c:920:11: warning: Potential leak of memory pointed to by 'fn' [unix.Malloc]
+  920 |       if(!fmt_add_after("CLS", fn)) return _("lost my CLS");
+      |           ^~~~~~~~~~~~~~~~~~~~~~~~
+src/ps/sortformat.c:920:44: warning: Potential leak of memory pointed to by 'fn' [unix.Malloc]
+  920 |       if(!fmt_add_after("CLS", fn)) return _("lost my CLS");
+      |                                            ^~~~~~~~~~~~~~~~
+./local/nls.h:25:18: note: expanded from macro '_'
+   25 | # define _(Text) gettext (Text)
+      |                  ^~~~~~~~~~~~~~
+/usr/include/libintl.h:109:25: note: expanded from macro 'gettext'
+  109 | # define gettext(msgid) dgettext (NULL, msgid)
+      |                         ^~~~~~~~~~~~~~~~~~~~~~
+/usr/include/libintl.h:112:3: note: expanded from macro 'dgettext'
+  112 |   dcgettext (domainname, msgid, LC_MESSAGES)
+      |   ^~~~~~~~~
+src/ps/sortformat.c:925:16: warning: Potential leak of memory pointed to by 'fn' [unix.Malloc]
+  925 |         return _("-T with H/-m/m but no PID for SPID to follow");
+      |                ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+./local/nls.h:25:18: note: expanded from macro '_'
+   25 | # define _(Text) gettext (Text)
+      |                  ^~~~~~~~~~~~~~
+/usr/include/libintl.h:109:25: note: expanded from macro 'gettext'
+  109 | # define gettext(msgid) dgettext (NULL, msgid)
+      |                         ^~~~~~~~~~~~~~~~~~~~~~
+/usr/include/libintl.h:112:3: note: expanded from macro 'dgettext'
+  112 |   dcgettext (domainname, msgid, LC_MESSAGES)
+      |   ^~~~~~~~~
+src/ps/sortformat.c:943:15: warning: Potential leak of memory pointed to by 'fn' [unix.Malloc]
+  943 |       fn->next=format_list;
+      |       ~~~~~~~~^~~~~~~~~~~~
+src/ps/sortformat.c:956:10: warning: Potential leak of memory pointed to by 'fn' [unix.Malloc]
+  956 |       if(fmt_add_after("UID", fn)) fmt_delete("UID");
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~
+src/ps/sortformat.c:958:10: warning: Potential leak of memory pointed to by 'fn' [unix.Malloc]
+  958 |   }while(0);
+      |          ^
+9 warnings generated.
+  CC       src/ps/stacktrace.o
+  CC       local/fileutils.o
+  CC       local/signals.o
+  CC       local/strutils.o
+  CC       library/capname.lo
+library/capname.c:95:21: warning: Value stored to 'size' is never read [deadcode.DeadStores]
+   95 |                     size -= 1;
+      |                     ^       ~
+1 warning generated.
+  CC       library/devname.lo
+  CC       library/diskstats.lo
+  CC       library/escape.lo
+  CC       library/meminfo.lo
+library/meminfo.c:754:5: warning: Address of stack memory associated with local variable 'buf' is still referred to by the static variable 'e' upon returning to the caller.  This will be a dangling reference [core.StackAddressEscape]
+  664 |     return 0;
+      |     ^~~~~~~~
+1 warning generated.
+  CC       library/namespace.lo
+  CC       library/numa.lo
+  CC       library/pids.lo
+  CC       library/pwcache.lo
+  CC       library/readproc.lo
+library/readproc.c: In function 'simple_readproc':
+library/readproc.c:1184:35: warning: '/fd' directive output may be truncated writing 3 bytes into a region of size between 1 and 64 [-Wformat-truncation=]
+ 1184 |     snprintf(buf, sizeof(buf), "%s/fd", path);
+      |                                   ^~~
+In file included from /usr/include/stdio.h:980,
+                 from library/readproc.c:27:
+In function 'snprintf',
+    inlined from 'stat_fd' at library/readproc.c:1184:5,
+    inlined from 'simple_readproc' at library/readproc.c:1339:9:
+/usr/include/x86_64-linux-gnu/bits/stdio2.h:54:10: note: '__builtin___snprintf_chk' output between 4 and 67 bytes into a destination of size 64
+   54 |   return __builtin___snprintf_chk (__s, __n, __USE_FORTIFY_LEVEL - 1,
+      |          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   55 |                                    __glibc_objsize (__s), __fmt,
+      |                                    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+   56 |                                    __va_arg_pack ());
+      |                                    ~~~~~~~~~~~~~~~~~
+library/readproc.c:797:13: warning: Potential leak of memory pointed to by 'rbuf' [unix.Malloc]
+  797 |             close(fd);
+      |             ^~~~~
+library/readproc.c:825:23: warning: Potential leak of memory pointed to by 'p' [unix.Malloc]
+  825 |     if (!rbuf) return NULL;
+      |                       ^~~~
+/usr/lib/llvm-18/lib/clang/18/include/__stddef_null.h:26:22: note: expanded from macro 'NULL'
+   26 | #define NULL ((void*)0)
+      |                      ^
+2 warnings generated.
+  CC       library/slabinfo.lo
+  CC       library/signames.lo
+library/signames.c:183:23: warning: Right operand is negative in left shift [core.BitwiseShift]
+  183 |         return ((uint64_t) 1 << (signum -1));
+      |                 ~~~~~~~~~~~~~^~~~~~~~~~~~~~
+library/signames.c:225:13: warning: Value stored to 'size' is never read [deadcode.DeadStores]
+  225 |             size -= n;
+      |             ^       ~
+2 warnings generated.
+  CC       library/stat.lo
+  CC       library/sysinfo.lo
+  CC       library/version.lo
+  CC       library/vmstat.lo
+library/vmstat.c:1228:5: warning: Address of stack memory associated with local variable 'buf' is still referred to by the static variable 'e' upon returning to the caller.  This will be a dangling reference [core.StackAddressEscape]
+ 1165 |     return 0;
+      |     ^~~~~~~~
+1 warning generated.
+  CC       library/wchan.lo
+  CC       library/uptime.lo
+library/uptime.c:298:13: warning: Value stored to 'comma' is never read [deadcode.DeadStores]
+  298 |             comma += 1;
+      |             ^        ~
+library/uptime.c:403:5: warning: 3rd function call argument is an uninitialized value [core.CallAndMessage]
+  403 |     procps_uptime_snprint( upbuf, UPTIME_BUFLEN, uptime_secs, 0);
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+library/uptime.c:422:5: warning: 3rd function call argument is an uninitialized value [core.CallAndMessage]
+  422 |     procps_uptime_snprint( shortbuf, UPTIME_BUFLEN, uptime_secs, 1);
+      |     ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+3 warnings generated.
+  CCLD     library/libproc2.la
+  CCLD     src/ps/pscommand
+  CC       src/free.o
+  CC       local/units.o
+  CCLD     src/free
+  CC       src/pgrep.o
+src/pgrep.c:543:31: warning: The right operand of '!=' is a garbage value [core.UndefinedBinaryOperatorResult]
+  543 |             if (proc_ns.ns[i] != match_ns->ns[i]) {
+      |                               ^  ~~~~~~~~~~~~~~~
+1 warning generated.
+  CCLD     src/pgrep
+  CCLD     src/pkill
+  CC       src/pmap.o
+src/pmap.c:1162:14: warning: Potential leak of memory pointed to by 'rc_filename' [unix.Malloc]
+ 1162 |         if ((size_t)argc >= INT_MAX / sizeof(pid_t))
+      |                     ^~~~
+1 warning generated.
+  CCLD     src/pmap
+  CC       src/pwdx.o
+  CCLD     src/pwdx
+  CC       src/tload.o
+  CCLD     src/tload
+  CC       src/uptime.o
+  CCLD     src/uptime
+  CC       src/vmstat.o
+src/vmstat.c:614:11: warning: Although the value stored to 'got' is used in the enclosing expression, the value is never actually read from 'got' [deadcode.DeadStores]
+  614 |     if (!(got = procps_diskstats_get(disk_stat, partition_name, DISKSTATS_TYPE)))
+      |           ^     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+1 warning generated.
+  CCLD     src/vmstat
+  CCLD     src/pidwait
+  CC       src/pidof.o
+src/pidof.c:129:2: warning: Value stored to 'len' is never read [deadcode.DeadStores]
+  129 |         len = path_alloc_size = 0;
+      |         ^     ~~~~~~~~~~~~~~~~~~~
+src/pidof.c:207:9: warning: Null pointer passed to 1st parameter expecting 'nonnull' [core.NonNullParamChecker]
+  207 |                         if (!strcmp(program, cmd_arg0base) ||
+      |                              ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+2 warnings generated.
+  CCLD     src/pidof
+  CC       src/kill.o
+  CCLD     src/kill
+  CC       src/w.o
+  CCLD     src/w
+  CC       src/watch-watch.o
+src/watch.c:353:3: warning: Value stored to 'c' is never read [deadcode.DeadStores]
+  353 |                 c = getc(fp);
+      |                 ^   ~~~~~~~~
+1 warning generated.
+  CC       local/src_watch-strutils.o
+  CC       local/src_watch-fileutils.o
+  CC       local/src_watch-signals.o
+  CCLD     src/watch
+  CC       src/top/top-top.o
+src/top/top.c:1375:19: warning: Although the value stored to 'pos' is used in the enclosing expression, the value is never actually read from 'pos' [deadcode.DeadStores]
+ 1375 |             cur = pos = 0;
+      |                   ^     ~
+src/top/top.c:1379:13: warning: Value stored to 'pos' is never read [deadcode.DeadStores]
+ 1379 |             pos = strlen(buf);
+      |             ^     ~~~~~~~~~~~
+src/top/top.c:1387:16: warning: Value stored to 'pos' is never read [deadcode.DeadStores]
+ 1387 |                pos = strlen(buf);
+      |                ^     ~~~~~~~~~~~
+src/top/top.c:1395:13: warning: Value stored to 'pos' is never read [deadcode.DeadStores]
+ 1395 |             pos = strlen(buf);
+      |             ^     ~~~~~~~~~~~
+src/top/top.c:1483:21: warning: Null pointer passed to 1st parameter expecting 'nonnull' [core.NonNullParamChecker]
+ 1483 |       *num = (float)strtol(str, &ep, 0);
+      |                     ^~~~~~~~~~~~~~~~~~~
+src/top/top.c:1602:8: warning: Dereference of null pointer (loaded from variable 'str') [core.NullDereference]
+ 1602 |    if (*str) {
+      |        ^~~~
+src/top/top.c:3254:10: warning: Assigned value is garbage or undefined [core.uninitialized.Assign]
+ 3254 |          unsigned char uch = tline[fr];
+      |          ^~~~~~~~~~~~~~~~~   ~~~~~~~~~
+src/top/top.c:3265:39: warning: Assigned value is garbage or undefined [core.uninitialized.Assign]
+ 3265 |                buf2[0] = uch; buf2[1] = tline[fr++];
+      |                                       ^ ~~~~~~~~~~~
+src/top/top.c:3269:39: warning: Assigned value is garbage or undefined [core.uninitialized.Assign]
+ 3269 |                buf3[0] = uch; buf3[1] = tline[fr++]; buf3[2] = tline[fr++];
+      |                                       ^ ~~~~~~~~~~~
+src/top/top.c:3273:39: warning: Assigned value is garbage or undefined [core.uninitialized.Assign]
+ 3273 |                buf4[0] = uch; buf4[1] = tline[fr++]; buf4[2] = tline[fr++]; buf4[3] = tline[fr++];
+      |                                       ^ ~~~~~~~~~~~
+src/top/top.c:3709:9: warning: Although the value stored to 'rc' is used in the enclosing expression, the value is never actually read from 'rc' [deadcode.DeadStores]
+ 3709 |    if ((rc = procps_stat_new(&Stat_ctx))) {
+      |         ^    ~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/top/top.c:3725:9: warning: Although the value stored to 'rc' is used in the enclosing expression, the value is never actually read from 'rc' [deadcode.DeadStores]
+ 3725 |    if ((rc = procps_meminfo_new(&Mem_ctx)))
+      |         ^    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/top/top.c:4359:37: warning: Dereference of null pointer (loaded from variable 'cp') [core.NullDereference]
+ 4359 |             if (!(got = strchr(get, tolower(*cp))) || strlen(cp) > 1)
+      |                                     ^~~~~~~~~~~~
+/usr/include/ctype.h:220:22: note: expanded from macro 'tolower'
+  220 | #  define tolower(c)    __tobody (c, tolower, *__ctype_tolower_loc (), (c))
+      |                         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/usr/include/ctype.h:169:20: note: expanded from macro '__tobody'
+  169 |         __res = (a)[(int) (c)];                                               \
+      |                           ^~~
+src/top/top.c:4365:37: warning: Dereference of null pointer (loaded from variable 'cp') [core.NullDereference]
+ 4365 |             if (!(got = strchr(get, tolower(*cp))) || strlen(cp) > 1)
+      |                                     ^~~~~~~~~~~~
+/usr/include/ctype.h:220:22: note: expanded from macro 'tolower'
+  220 | #  define tolower(c)    __tobody (c, tolower, *__ctype_tolower_loc (), (c))
+      |                         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/usr/include/ctype.h:169:20: note: expanded from macro '__tobody'
+  169 |         __res = (a)[(int) (c)];                                               \
+      |                           ^~~
+src/top/top.c:4389:17: warning: Dereference of null pointer (loaded from variable 'cp') [core.NullDereference]
+ 4389 |             if (*cp == '+') { SETw(Curwin, Qsrt_NORMAL); ++cp; }
+      |                 ^~~
+src/top/top.c:4405:19: warning: Null pointer passed to 1st parameter expecting 'nonnull' [core.NonNullParamChecker]
+ 4405 |                || strpbrk(cp, "+-."))
+      |                   ^~~~~~~~~~~~~~~~~~
+src/top/top.c:6021:14: warning: Dereference of null pointer [core.NullDereference]
+ 6021 |          if (CHKw(w, Show_IDLEPS)) { beg_sav = w->begtask; w->begtask = 0; }
+      |              ^~~~~~~~~~~~~~~~~~~~
+src/top/top.h:412:28: note: expanded from macro 'CHKw'
+  412 | #define CHKw(q,f)    (int)((q)->rc.winflags & (f))
+      |                            ^~~~~~~~~~~~~~~~
+17 warnings generated.
+  CC       src/top/top-top_nls.o
+  CC       local/src_top_top-fileutils.o
+  CC       local/src_top_top-signals.o
+  CC       local/src_top_top-strutils.o
+  CCLD     src/top/top
+  CC       src/slabtop-slabtop.o
+  CC       local/src_slabtop-strutils.o
+  CC       local/src_slabtop-fileutils.o
+  CC       local/src_slabtop-units.o
+  CCLD     src/slabtop
+  CC       src/hugetop-hugetop.o
+src/hugetop.c:306:22: warning: Access to field 'nr_hg_state' results in a dereference of a null pointer (loaded from variable 'node') [core.NullDereference]
+  306 |         for (int i = 0; i < node->nr_hg_state; i++) {
+      |                             ^~~~~~~~~~~~~~~~~
+1 warning generated.
+  CC       local/src_hugetop-strutils.o
+  CC       local/src_hugetop-fileutils.o
+  CC       local/src_hugetop-units.o
+  CCLD     src/hugetop
+  CC       src/sysctl.o
+src/sysctl.c:418:8: warning: Although the value stored to 'rlen' is used in the enclosing expression, the value is never actually read from 'rlen' [deadcode.DeadStores]
+  418 |                 if ((rlen = getline(&iobuf, &iolen, fp)) > 0) {
+      |                      ^      ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/sysctl.c:432:16: warning: Although the value stored to 'rlen' is used in the enclosing expression, the value is never actually read from 'rlen' [deadcode.DeadStores]
+  432 |                                         } while ((rlen = getline(&iobuf, &iolen, fp)) > 0);
+      |                                                   ^      ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/sysctl.c:443:14: warning: Although the value stored to 'rlen' is used in the enclosing expression, the value is never actually read from 'rlen' [deadcode.DeadStores]
+  443 |                         } while ((rlen = getline(&iobuf, &iolen, fp)) > 0);
+      |                                   ^      ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+src/sysctl.c:1072:6: warning: Potential leak of memory pointed to by 'setlist' [unix.Malloc]
+ 1072 |         if (argc < 1)
+      |             ^~~~
+src/sysctl.c:1085:31: warning: Potential leak of memory pointed to by 's' [unix.Malloc]
+ 1085 |                 ReturnCode |= WriteSetting(s->key, s->path, s->value,
+      |                               ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+ 1086 |                                            s->ignore_failure);
+      |                                            ~~~~~~~~~~~~~~~~~~
+5 warnings generated.
+  CC       local/procio.o
+  CCLD     src/sysctl
+make[2]: Leaving directory '/procps'
+make[1]: Leaving directory '/procps'
+scan-build: Analysis run complete.
+scan-build: 51 bugs found.
+scan-build: Run 'scan-view /tmp/scan-build-2024-11-27-145754-31357-1' to examine bug reports.
