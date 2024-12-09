@@ -13,11 +13,8 @@ const char *scale_size(unsigned long size, unsigned int exponent, int si, int hu
 	static char up[] = { 'B', 'K', 'M', 'G', 'T', 'P', 0 };
 	static char buf[BUFSIZ];
 	int i;
-	float base;
-	long long bytes;
-
-	base = si ? 1000.0 : 1024.0;
-	bytes = size * 1024LL;
+	unsigned int base = si ? 1000 : 1024;
+	long long bytes = size * 1024LL;
 
 	if (!humanreadable) {
 		switch (exponent) {
@@ -41,21 +38,26 @@ const char *scale_size(unsigned long size, unsigned int exponent, int si, int hu
 	if (4 >= snprintf(buf, sizeof(buf), "%lld%c", bytes, up[0]))
 		return buf;
 
-	for (i = 1; up[i] != 0; i++) {
-		if (si) {
+	double power = base;
+	if (si) {
+		for (i = 1; up[i] != 0; i++) {
 			if (4 >= snprintf(buf, sizeof(buf), "%.1f%c",
-			                  (float)(bytes / power(base, i)), up[i]))
+			                  (float)(bytes / power), up[i]))
 				return buf;
 			if (4 >= snprintf(buf, sizeof(buf), "%ld%c",
-			                  (long)(bytes / power(base, i)), up[i]))
+			                  (long)(bytes / power), up[i]))
 				return buf;
-		} else {
+			power *= base;
+		}
+	} else {
+		for (i = 1; up[i] != 0; i++) {
 			if (5 >= snprintf(buf, sizeof(buf), "%.1f%ci",
-			                  (float)(bytes / power(base, i)), up[i]))
+			                  (float)(bytes / power), up[i]))
 				return buf;
 			if (5 >= snprintf(buf, sizeof(buf), "%ld%ci",
-			                  (long)(bytes / power(base, i)), up[i]))
+			                  (long)(bytes / power), up[i]))
 				return buf;
+			power *= base;
 		}
 	}
 	/*
