@@ -75,7 +75,8 @@ static int run_once;
 static int numa;
 static int human;
 static struct termios saved_tty;
-static long delay = 3;
+static const long default_delay = 3;
+static long delay = default_delay;
 
 enum pids_item Items[] = {
 	PIDS_ID_PID,
@@ -399,20 +400,20 @@ static void print_procs(void)
 	free(line);
 }
 
-static void __attribute__ ((__noreturn__)) usage(FILE * out)
+static void __attribute__ ((__noreturn__)) usage(FILE * stream)
 {
-	fputs(USAGE_HEADER, out);
-	fprintf(out, _(" %s [options]\n"), program_invocation_short_name);
-	fputs(USAGE_OPTIONS, out);
-	fputs(_(" -d, --delay <secs>  delay updates\n"), out);
-	fputs(_(" -n, --numa          display per NUMA nodes Huge pages information\n"), out);
-	fputs(_(" -o, --once          only display once, then exit\n"), out);
-	fputs(_(" -H, --human         display human-readable output\n"), out);
-	fputs(USAGE_SEPARATOR, out);
-	fputs(USAGE_HELP, out);
-	fputs(USAGE_VERSION, out);
+	fputs(USAGE_HEADER, stream);
+	fprintf(stream, _(" %s [-Hno] [-d SECS]\n"), program_invocation_short_name);
+	fputs(USAGE_OPTIONS, stream);
+	fprintf(stream, _(" -d SECS, --delay SECS  delay SECS seconds between updates (default: %ld)\n"), default_delay);
+	fputs(_(" -n, --numa             display per-NUMA node huge page information\n"), stream);
+	fputs(_(" -o, --once             display once then exit\n"), stream);
+	fputs(_(" -H, --human            display human-readable output\n"), stream);
+	fputs(USAGE_SEPARATOR, stream);
+	fputs(USAGE_HELP, stream);
+	fputs(USAGE_VERSION, stream);
 
-	exit(out == stderr ? EXIT_FAILURE : EXIT_SUCCESS);
+	exit(stream == stderr ? 2 : EXIT_SUCCESS);
 }
 
 int main(int argc, char **argv)
