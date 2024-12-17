@@ -49,10 +49,15 @@ Display version information and exit.
 .PP
 .TP
 .B 0
-Success.
+The program operated successfully.
 .TP
-.B Others
-Errno.
+.B 1
+The kernel lacks support for the huge page feature,
+or a system call or library function failed;
+a diagnostic message reports specifics.
+.TP
+.B 2
+The program could not interpret its command-line arguments.
 .SH AUTHOR
 zhenwei pi <pizhenwei@bytedance.com>
 .SH "SEE ALSO"

@@ -109,13 +109,17 @@ static void setup_hugepage()
 	/* 1, verify "Hugepagesize" from /proc/meminfo. is huge pages supported on kernel building? */
 	ret = procps_meminfo_new(&mem_info);
 	if (ret) {
-		fputs("Huge page not found or not supported", stdout);
-		exit(-ret);
+		fprintf(stderr, "%s: fatal error: kernel lacks huge"
+			" page support\n",
+			program_invocation_short_name);
+		exit(EXIT_FAILURE);
 	}
 
 	if (!MEMINFO_GET(mem_info, MEMINFO_MEM_HUGE_SIZE, ul_int)) {
-		fputs("Huge page not found or not supported", stdout);
-		exit(ENOTSUP);
+		fprintf(stderr, "%s: fatal error: kernel lacks huge"
+			" page support\n",
+			program_invocation_short_name);
+		exit(EXIT_FAILURE);
 	}
 
 	procps_meminfo_unref(&mem_info);
@@ -127,8 +131,10 @@ static void setup_hugepage()
 	 */
 	ret = stat("/sys/devices/system/node/node0/hugepages", &statbuf);
 	if (ret) {
-		fputs("Per NUMA node huge page attributes not supported", stdout);
-		exit(-ret);
+		fprintf(stderr, "%s: fatal error: kernel lacks per-NUMA"
+			" huge page attribute support\n",
+			program_invocation_short_name);
+		exit(EXIT_FAILURE);
 	}
 }
 
@@ -157,19 +163,26 @@ static unsigned long hg_read_attribute(const char *dir, const char *hg, const ch
 	char path[PATH_MAX] = { 0 };
 	char buf[64] = { 0 };
 	int fd;
+	int err; // saved errno; curses _shouldn't_ clobber it, but...
 
 	snprintf(path, sizeof(path), "%s/%s/%s", dir, hg, attr);
 	fd = open(path, O_RDONLY);
 	if (fd == -1) {
+		err = errno;
 		endwin();
-		printf("Failed to open %s\n", path);
-		exit(errno);
+		fprintf(stderr, "%s: unable to open \"%s\": %s\n",
+			program_invocation_short_name, path,
+			strerror(errno));
+		exit(EXIT_FAILURE);
 	}
 
 	if (read(fd, buf, sizeof(buf)) == -1) {
+		err = errno;
 		endwin();
-		printf("Failed to read %s\n", path);
-		exit(errno);
+		fprintf(stderr, "%s: unable to read \"%s\": %s\n",
+			program_invocation_short_name, path,
+			strerror(errno));
+		exit(EXIT_FAILURE);
 	}
 
 	close(fd);
@@ -191,6 +204,7 @@ static void hg_states_one_node(struct node_hg_states *node, const char *name)
 	struct dirent *hg;
 	char path[PATH_MAX] = { 0 };
 	struct hg_state *state;
+	int err; // saved errno; curses _shouldn't_ clobber it, but...
 
 	memset(node, 0x00, sizeof(*node));
 	strncpy(node->node, name, sizeof(node->node) - 1);
@@ -199,9 +213,12 @@ static void hg_states_one_node(struct node_hg_states *node, const char *name)
 	snprintf(path, sizeof(path), "%s/%s/hugepages", SYS_NODES, name);
 	hg_dir = opendir(path);
 	if (!hg_dir) {
+		err = errno;
 		endwin();
-		printf("Failed to open %s\n", path);
-		exit(errno);
+		fprintf(stderr, "%s: unable to open \"%s\": %s\n",
+			program_invocation_short_name, path,
+			strerror(errno));
+		exit(EXIT_FAILURE);
 	}
 
 	while ((hg = readdir(hg_dir))) {
@@ -233,12 +250,16 @@ static void hg_states_new(struct nodes_hg_states *nodes)
 	DIR *nodes_dir;
 	struct dirent *dirent;
 	struct node_hg_states *node;
+	int err; // saved errno; curses _shouldn't_ clobber it, but...
 
 	nodes_dir = opendir(SYS_NODES);
 	if (!nodes_dir) {
+		err = errno;
 		endwin();
-		fputs("Failed to open " SYS_NODES, stdout);
-		exit(errno);
+		fprintf(stderr, "%s: unable to open \"%s\": %s\n",
+			program_invocation_short_name, SYS_NODES,
+			strerror(errno));
+		exit(EXIT_FAILURE);
 	}
 
 	while ((dirent = readdir(nodes_dir))) {
