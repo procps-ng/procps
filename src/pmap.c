@@ -128,6 +128,7 @@ usage(FILE * out)
 	fputs(_(" -n, --create-rc             create new default rc\n"), out);
 	fputs(_(" -N, --create-rc-to=<file>   create new rc to file\n"), out);
 	fputs(_("            NOTE: pid arguments are not allowed with -n, -N\n"), out);
+	fputs(_(" -f, --fields=field[,...]    show the specified field(s)\n"), out);
 	fputs(_(" -d, --device                show the device format\n"), out);
 	fputs(_(" -q, --quiet                 do not display header and footer\n"), out);
 	fputs(_(" -p, --show-path             show path in the mapping\n"), out);
@@ -148,6 +149,7 @@ static unsigned long range_high = ~0ul;
 static int c_option = 0;
 static int C_option = 0;
 static int d_option = 0;
+static int f_option = 0;
 static int n_option = 0;
 static int N_option = 0;
 static int q_option = 0;
@@ -307,7 +309,7 @@ static int is_enabled (const char *s)
 
 	if (X_option == 1) return !is_unimportant(s);
 
-	if (c_option) {  /* taking the list of disabled fields from the rc file */
+	if (f_option) {  /* taking the list of disabled fields from the rc file */
 
 		for (cnf_listnode = cnf_listhead; cnf_listnode; cnf_listnode = cnf_listnode -> next) {
 			if (!strcmp(s, cnf_listnode -> description)) return 1;
@@ -331,6 +333,18 @@ static int enable(const char *token)
 	cnf_listnode -> next = cnf_listhead;
 	cnf_listhead = cnf_listnode;
 	return 1;
+}
+
+static void enable_list (char *list)
+{
+	char *token;
+
+	token = strtok(list, ",");
+	while (token && *token) {
+		if (!enable(token))
+			errx(EXIT_FAILURE, _("memory allocation failed"));
+		token = strtok(NULL, ",");
+	}
 }
 
 static void print_extended_maps (FILE *f)
@@ -598,7 +612,7 @@ static int one_proc (struct pids_stack *p, unsigned use_kname)
 
 	printf("%u:   %s\n", PIDS_VAL(tgid, s_int, p), PIDS_VAL(cmdline, str, p));
 
-	if (x_option || X_option || c_option) {
+	if (x_option || X_option || f_option) {
 		snprintf(buf, sizeof buf, "/proc/%u/smaps", PIDS_VAL(tgid, s_int, p));
 		if ((fp = fopen(buf, "r")) == NULL)
 			return 1;
@@ -608,7 +622,7 @@ static int one_proc (struct pids_stack *p, unsigned use_kname)
 			return 1;
 	}
 
-	if (X_option || c_option) {
+	if (X_option || f_option) {
 		print_extended_maps(fp);
         fclose(fp);
 		return 0;
@@ -1086,6 +1100,7 @@ int main(int argc, char **argv)
 		{"create-rc-to", required_argument, NULL, 'N'},
 		{"show-path", no_argument, NULL, 'p'},
 		{"use-kernel-name", no_argument, NULL, 'k'},
+		{"fields", required_argument, NULL, 'f'},
 		{NULL, 0, NULL, 0}
 	};
 
@@ -1098,7 +1113,7 @@ int main(int argc, char **argv)
 	if (argc < 2)
 		usage(stderr);
 
-	while ((c = getopt_long(argc, argv, "xXrdqA:hVcC:nN:pk", longopts, NULL)) != -1)
+	while ((c = getopt_long(argc, argv, "xXrdqA:hVcC:nN:pkf:", longopts, NULL)) != -1)
 		switch (c) {
 		case 'x':
 			x_option = 1;
@@ -1143,6 +1158,10 @@ int main(int argc, char **argv)
 		case 'k':
 			use_kname = 1;
 			break;
+		case 'f':
+			f_option = 1;
+			enable_list(optarg);
+			break;
 		case 'a':	/* Sun prints anon/swap reservations */
 		case 'F':	/* Sun forces hostile ptrace-like grab */
 		case 'l':	/* Sun shows unresolved dynamic names */
@@ -1156,8 +1175,8 @@ int main(int argc, char **argv)
 	argc -= optind;
 	argv += optind;
 
-	if (c_option + C_option + d_option + n_option + N_option + x_option + !!X_option > 1)
-		errx(EXIT_FAILURE, _("options -c, -C, -d, -n, -N, -x, -X are mutually exclusive"));
+	if (c_option + C_option + d_option + f_option + n_option + N_option + x_option + !!X_option > 1)
+		errx(EXIT_FAILURE, _("options -c, -C, -d, -F, -n, -N, -x, -X are mutually exclusive"));
 
 	if ((n_option || N_option) && (q_option || map_desc_showpath))
 		errx(EXIT_FAILURE, _("options -p, -q are mutually exclusive with -n, -N"));
@@ -1195,6 +1214,8 @@ int main(int argc, char **argv)
 	if (C_option) c_option = 1;
 
 	if (c_option) {
+		f_option = 1;
+
 		if (!C_option) rc_filename = get_default_rc_filename();
 
 		if (!rc_filename) return(EXIT_FAILURE);
