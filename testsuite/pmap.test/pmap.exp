@@ -133,6 +133,13 @@ if { $shmaddr == "" } {
     expect_table $test [pmap_make_generic_header $testshmproc_pid] \
         "\[^\\r=\]+\\r\\s*0*${shmaddr}\[^\\r\]+\\r" \
         "\[= \]+"
+
+    set test "pmap specified fields"
+    # pmap always prints Address.
+    spawn $pmap -f Perm,Size -A $shmaddr $testshmproc_pid
+    expect_table $test [pmap_make_name ${testshmproc_pid}] \
+        "\\s*Address\\s+Perm\\s+Size\\s*\\r\\s*0*${shmaddr}\\s+\[-rs\]+\\s+\[0-9\]+\\r" \
+        "\[= \]+\\r\\s*\[0-9\]+\\s+KB"
 }
 kill_testshm_proc
 
