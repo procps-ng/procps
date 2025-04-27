@@ -285,7 +285,7 @@ struct cnf_listnode {
 	struct cnf_listnode *next;
 };
 
-static struct cnf_listnode *cnf_listhead=NULL, *cnf_listnode;
+static struct cnf_listnode *cnf_listhead=NULL;
 
 static int is_unimportant (const char *s)
 {
@@ -303,6 +303,8 @@ static int is_unimportant (const char *s)
 /* check, whether we want to display the field or not */
 static int is_enabled (const char *s)
 {
+	struct cnf_listnode *cnf_listnode;
+
 	if (X_option == 1) return !is_unimportant(s);
 
 	if (c_option) {  /* taking the list of disabled fields from the rc file */
@@ -846,6 +848,7 @@ static int config_read (char *rc_filename)
 	int length;
 	char *tail, *token;
 	int line_cnt, section_id;
+	struct cnf_listnode *cnf_listnode;
 
 	f = fopen(rc_filename, "r");
 
@@ -1059,6 +1062,7 @@ int main(int argc, char **argv)
 	int ret = 0, c, conf_ret;
 	char *rc_filename = NULL;
 	unsigned use_kname = 0;
+	struct cnf_listnode *cnf_listnode;
 
 	static const struct option longopts[] = {
 		{"extended", no_argument, NULL, 'x'},
