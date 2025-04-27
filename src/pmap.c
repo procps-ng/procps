@@ -319,6 +319,19 @@ static int is_enabled (const char *s)
 	return 1;
 }
 
+static int enable(const char *token)
+{
+	/* add the field in the list */
+	struct cnf_listnode *cnf_listnode;
+
+	if (!(cnf_listnode = calloc(1, sizeof *cnf_listnode)))
+		return 0;
+
+	snprintf(cnf_listnode -> description, sizeof(cnf_listnode -> description), "%s", token);
+	cnf_listnode -> next = cnf_listhead;
+	cnf_listhead = cnf_listnode;
+	return 1;
+}
 
 static void print_extended_maps (FILE *f)
 {
@@ -919,15 +932,11 @@ static int config_read (char *rc_filename)
 						warnx(_("syntax error found in the config - line %d"), line_cnt);
 					}
 
-					/* add the field in the list */
-					if (!(cnf_listnode = calloc(1, sizeof *cnf_listnode))) {
+					if (!enable(token)) {
 						warnx(_("memory allocation failed"));
 						fclose(f);
 						return 0;
 					}
-					snprintf(cnf_listnode -> description, sizeof(cnf_listnode -> description), "%s", token);
-					cnf_listnode -> next = cnf_listhead;
-					cnf_listhead = cnf_listnode;
 				}
 
 				break;
