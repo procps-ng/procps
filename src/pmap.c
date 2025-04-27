@@ -136,6 +136,7 @@ usage(FILE * out)
 	fputs(_(" -A, --range=<low>[,<high>]  limit results to the given range\n"), out);
 	fputs(USAGE_SEPARATOR, out);
 	fputs(USAGE_HELP, out);
+	fputs(_(" -H, --list-fields           list field names\n"), out);
 	fputs(USAGE_VERSION, out);
 	fprintf(out, USAGE_MAN_TAIL("pmap(1)"));
 	exit(out == stderr ? EXIT_FAILURE : EXIT_SUCCESS);
@@ -345,6 +346,60 @@ static void enable_list (char *list)
 			errx(EXIT_FAILURE, _("memory allocation failed"));
 		token = strtok(NULL, ",");
 	}
+}
+
+static void skip_line(FILE *f)
+{
+	int c;
+
+	while ((c = getc(f)) != EOF) {
+		if (c == '\n')
+			break;
+	}
+}
+
+static int print_line_prefix(FILE *f)
+{
+	int c = getc(f);
+
+	if (c == EOF)
+		return 0;
+
+	if ('0' <= c && c <= '9')
+		return 0;
+
+	do {
+		putchar(c);
+		c = getc(f);
+		if (c == ':') {
+			putchar('\n');
+			skip_line(f);
+			return 1;
+		}
+	} while (c != EOF);
+	return 0;
+}
+
+static int __attribute__ ((__noreturn__))
+print_field_names (void)
+{
+	FILE *f;
+
+	puts(nls_Address);
+	puts(nls_Perm);
+	puts(nls_Offset);
+	puts(nls_Device);
+	puts(nls_Inode);
+	puts(nls_Mapping);
+
+	f = fopen("/proc/self/smaps", "r");
+	if (!f)
+		err(EXIT_FAILURE, _("failed to open /proc/self/maps"));
+	skip_line (f);
+	while (print_line_prefix(f));
+	fclose(f);
+
+	exit(EXIT_SUCCESS);
 }
 
 static void print_extended_maps (FILE *f)
@@ -1101,6 +1156,7 @@ int main(int argc, char **argv)
 		{"show-path", no_argument, NULL, 'p'},
 		{"use-kernel-name", no_argument, NULL, 'k'},
 		{"fields", required_argument, NULL, 'f'},
+		{"list-fields", required_argument, NULL, 'H'},
 		{NULL, 0, NULL, 0}
 	};
 
@@ -1113,7 +1169,7 @@ int main(int argc, char **argv)
 	if (argc < 2)
 		usage(stderr);
 
-	while ((c = getopt_long(argc, argv, "xXrdqA:hVcC:nN:pkf:", longopts, NULL)) != -1)
+	while ((c = getopt_long(argc, argv, "xXrdqA:hVcC:nN:pkf:H", longopts, NULL)) != -1)
 		switch (c) {
 		case 'x':
 			x_option = 1;
@@ -1161,6 +1217,9 @@ int main(int argc, char **argv)
 		case 'f':
 			f_option = 1;
 			enable_list(optarg);
+			break;
+		case 'H':
+			print_field_names();
 			break;
 		case 'a':	/* Sun prints anon/swap reservations */
 		case 'F':	/* Sun forces hostile ptrace-like grab */
