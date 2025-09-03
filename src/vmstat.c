@@ -82,6 +82,8 @@ static int y_option;
 /* "-t" means "show timestamp" */
 static int t_option;
 
+/* show memory info from cgroup inside container */
+static int container_mode = 0;
 static unsigned sleep_time = 1;
 static int infinite_updates = 0;
 static unsigned long num_updates =1;
@@ -232,6 +234,7 @@ static void __attribute__ ((__noreturn__))
     fputs(_(" -w, --wide             wide output\n"), out);
     fputs(_(" -t, --timestamp        show timestamp\n"), out);
     fputs(_(" -y, --no-first         skips first line of output\n"), out);
+    fputs(_(" -C, --container        show container memory info\n"), out);
     fputs(USAGE_SEPARATOR, out);
     fputs(USAGE_HELP, out);
     fputs(USAGE_VERSION, out);
@@ -404,6 +407,7 @@ static void new_format(void)
     unsigned long pgpgin[2], pgpgout[2], pswpin[2] = {0,0}, pswpout[2];
     unsigned int sleep_half;
     unsigned long kb_per_page = sysconf(_SC_PAGESIZE) / 1024ul;
+    int ret = 0;
     int debt = 0;        /* handle idle ticks running backwards */
     struct tm *tm_ptr;
     time_t the_time;
@@ -422,7 +426,12 @@ static void new_format(void)
         errx(EXIT_FAILURE, _("Unable to create vmstat structure"));
     if (procps_stat_new(&stat_info) < 0)
         errx(EXIT_FAILURE, _("Unable to create system stat structure"));
-    if (procps_meminfo_new(&mem_info) < 0)
+    if (container_mode == 1) {
+        ret = cgroup_meminfo_new(&mem_info);
+    } else {
+        ret = procps_meminfo_new(&mem_info);
+    }
+    if (ret < 0)
         errx(EXIT_FAILURE, _("Unable to create meminfo structure"));
     if (procps_uptime(&uptime, NULL) < 0)
         err(EXIT_FAILURE, _("Unable to get uptime"));
@@ -886,6 +895,7 @@ static void sum_format(void)
 #define TICv(E) STAT_VAL(E, ull_int, stat_stack)
 #define SYSv(E) STAT_VAL(E, ul_int, stat_stack)
 #define MEMv(E) unitConvert(MEMINFO_VAL(E, ul_int, mem_stack))
+    int ret = 0;
     struct stat_info *stat_info = NULL;
     struct vmstat_info *vm_info = NULL;
     struct meminfo_info *mem_info = NULL;
@@ -898,7 +908,12 @@ static void sum_format(void)
         errx(EXIT_FAILURE, _("Unable to select stat information"));
     if (procps_vmstat_new(&vm_info) < 0)
         errx(EXIT_FAILURE, _("Unable to create vmstat structure"));
-    if (procps_meminfo_new(&mem_info) < 0)
+    if (container_mode == 1) {
+        ret = cgroup_meminfo_new(&mem_info);
+    } else {
+        ret = procps_meminfo_new(&mem_info);
+    }
+    if (ret < 0)
         errx(EXIT_FAILURE, _("Unable to create meminfo structure"));
     if (!(mem_stack = procps_meminfo_select(mem_info, Sum_mem_items, 10)))
         errx(EXIT_FAILURE, _("Unable to select memory information"));
@@ -991,6 +1006,7 @@ int main(int argc, char *argv[])
         {"help", no_argument, NULL, 'h'},
         {"version", no_argument, NULL, 'V'},
         {"no-first", no_argument, NULL, 'y'},
+        {"container", no_argument, NULL, 'C'},
         {NULL, 0, NULL, 0}
     };
 
@@ -1003,7 +1019,7 @@ int main(int argc, char *argv[])
     atexit(close_stdout);
 
     while ((c =
-        getopt_long(argc, argv, "afmnsdDp:S:wthVy", longopts, NULL)) != -1)
+        getopt_long(argc, argv, "afmnsdDp:S:wthVyC", longopts, NULL)) != -1)
         switch (c) {
         case 'V':
             printf(PROCPS_NG_VERSION);
@@ -1036,6 +1052,9 @@ int main(int argc, char *argv[])
             partition = optarg;
             if (strncmp(partition, "/dev/", 5) == 0)
                 partition += 5;
+            break;
+        case 'C':
+            container_mode = 1;
             break;
         case 'S':
             switch (optarg[0]) {
