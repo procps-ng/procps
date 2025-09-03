@@ -130,6 +130,10 @@ struct stacks_extent {
     struct meminfo_stack **stacks;
 };
 
+enum meminfo_source_type {
+    PROC_MEMINFO_TYPE = 0,
+};
+
 struct meminfo_info {
     int refcount;
     int meminfo_fd;
@@ -140,6 +144,7 @@ struct meminfo_info {
     struct hsearch_data hashtab;
     struct meminfo_result get_this;
     time_t sav_secs;
+    enum meminfo_source_type stype;
 };
 
 
@@ -648,29 +653,8 @@ static int meminfo_make_hash_failed (
  #undef htXTRA
 } // end: meminfo_make_hash_failed
 
-
-/*
- * meminfo_read_failed():
- *
- * Read the data out of /proc/meminfo putting the information
- * into the supplied info structure
- */
-static int meminfo_read_failed (
-        struct meminfo_info *info)
-{
- /* a 'memory history reference' macro for readability,
-    so we can focus the field names ... */
- #define mHr(f) info->hist.new. f
-    char buf[MEMINFO_BUFF];
-    char *head, *tail;
+static int procps_meminfo_read_buf(struct meminfo_info *info, char *buf, int len) {
     int size;
-    unsigned long *valptr;
-    signed long mem_used;
-
-    // remember history from last time around
-    memcpy(&info->hist.old, &info->hist.new, sizeof(struct meminfo_data));
-    // clear out the soon to be 'current' values
-    memset(&info->hist.new, 0, sizeof(struct meminfo_data));
 
     if (-1 == info->meminfo_fd
     && (-1 == (info->meminfo_fd = open(MEMINFO_FILE, O_RDONLY))))
@@ -688,7 +672,7 @@ static int meminfo_read_failed (
     }
 
     for (;;) {
-        if ((size = read(info->meminfo_fd, buf, sizeof(buf)-1)) < 0) {
+        if ((size = read(info->meminfo_fd, buf, len-1)) < 0) {
             if (errno == EINTR || errno == EAGAIN)
                 continue;
             return 1;
@@ -700,6 +684,42 @@ static int meminfo_read_failed (
         return 1;
     }
     buf[size] = '\0';
+    return 0;
+}
+
+/*
+ * meminfo_read_failed():
+ *
+ * Read the data out of /proc/meminfo putting the information
+ * into the supplied info structure
+ */
+static int meminfo_read_failed (
+        struct meminfo_info *info)
+{
+ /* a 'memory history reference' macro for readability,
+    so we can focus the field names ... */
+ #define mHr(f) info->hist.new. f
+    char buf[MEMINFO_BUFF];
+    char *head, *tail;
+    int ret = -1;
+    enum meminfo_source_type stype = info->stype;
+    unsigned long *valptr;
+    signed long mem_used;
+
+    if (stype != PROC_MEMINFO_TYPE)
+        return ret;
+
+    // remember history from last time around
+    memcpy(&info->hist.old, &info->hist.new, sizeof(struct meminfo_data));
+    // clear out the soon to be 'current' values
+    memset(&info->hist.new, 0, sizeof(struct meminfo_data));
+
+    if (stype == PROC_MEMINFO_TYPE) {
+        ret = procps_meminfo_read_buf(info, buf, sizeof(buf));
+    }
+
+    if (ret != 0)
+        return ret;
 
     head = buf;
 
@@ -811,24 +831,8 @@ static struct stacks_extent *meminfo_stacks_alloc (
     return p_blob;
 } // end: meminfo_stacks_alloc
 
-
-// ___ Public Functions |||||||||||||||||||||||||||||||||||||||||||||||||||||||
-
-// --- standard required functions --------------------------------------------
-
-/*
- * procps_meminfo_new:
- *
- * Create a new container to hold the stat information
- *
- * The initial refcount is 1, and needs to be decremented
- * to release the resources of the structure.
- *
- * Returns: < 0 on failure, 0 on success along with
- *          a pointer to a new context struct
- */
-PROCPS_EXPORT int procps_meminfo_new (
-        struct meminfo_info **info)
+static int meminfo_new_internal (struct meminfo_info **info,
+        enum meminfo_source_type type)
 {
     struct meminfo_info *p;
 
@@ -857,6 +861,7 @@ PROCPS_EXPORT int procps_meminfo_new (
         return -errno;
     }
 
+    p->stype = type;
     /* do a priming read here for the following potential benefits: |
          1) ensure there will be no problems with subsequent access |
          2) make delta results potentially useful, even if 1st time |
@@ -870,6 +875,24 @@ PROCPS_EXPORT int procps_meminfo_new (
     return 0;
 } // end: procps_meminfo_new
 
+// ___ Public Functions |||||||||||||||||||||||||||||||||||||||||||||||||||||||
+
+// --- standard required functions --------------------------------------------
+/*
+ * procps_meminfo_new:
+ *
+ * Create a new container to hold the stat information
+ *
+ * The initial refcount is 1, and needs to be decremented
+ * to release the resources of the structure.
+ *
+ * Returns: < 0 on failure, 0 on success along with
+ *          a pointer to a new context struct
+ */
+PROCPS_EXPORT int procps_meminfo_new (
+        struct meminfo_info **info){
+    return meminfo_new_internal(info, PROC_MEMINFO_TYPE);
+}
 
 PROCPS_EXPORT int procps_meminfo_ref (
         struct meminfo_info *info)
