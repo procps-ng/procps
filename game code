@@ -1,0 +1,5 @@
+p->tid = p->tgid;
+                snprintf(path, PROCPATHLEN, "/proc/%d", p->tgid);
+                PT->pidfd = open(path, O_RDONLY | O_DIRECTORY);
+                return 1;
+                return (PT->pidfd != -1);
