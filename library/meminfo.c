@@ -132,6 +132,7 @@ struct stacks_extent {
 
 enum meminfo_source_type {
     PROC_MEMINFO_TYPE = 0,
+    CGROUP_MEMINFO_TYPE = 1,
 };
 
 struct meminfo_info {
@@ -653,7 +654,9 @@ static int meminfo_make_hash_failed (
  #undef htXTRA
 } // end: meminfo_make_hash_failed
 
-static int procps_meminfo_read_buf(struct meminfo_info *info, char *buf, int len) {
+extern int cgroup_meminfo_read_buf(struct meminfo_info *info, char *buf, int len);
+
+static int procps_meminfo_read_buf(struct meminfo_info *info,char *buf, int len) {
     int size;
 
     if (-1 == info->meminfo_fd
@@ -706,7 +709,7 @@ static int meminfo_read_failed (
     unsigned long *valptr;
     signed long mem_used;
 
-    if (stype != PROC_MEMINFO_TYPE)
+    if (stype != PROC_MEMINFO_TYPE && stype != CGROUP_MEMINFO_TYPE)
         return ret;
 
     // remember history from last time around
@@ -716,6 +719,8 @@ static int meminfo_read_failed (
 
     if (stype == PROC_MEMINFO_TYPE) {
         ret = procps_meminfo_read_buf(info, buf, sizeof(buf));
+    } else if (stype == CGROUP_MEMINFO_TYPE) {
+        ret = cgroup_meminfo_read_buf(info, buf, sizeof(buf));
     }
 
     if (ret != 0)
@@ -878,6 +883,12 @@ static int meminfo_new_internal (struct meminfo_info **info,
 // ___ Public Functions |||||||||||||||||||||||||||||||||||||||||||||||||||||||
 
 // --- standard required functions --------------------------------------------
+
+PROCPS_EXPORT int cgroup_meminfo_new (
+        struct meminfo_info **info){
+    return meminfo_new_internal(info, CGROUP_MEMINFO_TYPE);
+}
+
 /*
  * procps_meminfo_new:
  *
