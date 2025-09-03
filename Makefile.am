@@ -272,6 +272,7 @@ library_libproc2_la_LDFLAGS = \
 library_libproc2_la_SOURCES = \
 	library/capname.c \
         local/capnames.h \
+	library/cgmeminfo.c \
 	library/devname.c \
 	library/include/devname.h \
 	library/diskstats.c \
