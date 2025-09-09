@@ -831,6 +831,7 @@ PROCPS_EXPORT int procps_meminfo_new (
         struct meminfo_info **info)
 {
     struct meminfo_info *p;
+    time_t cur_secs;
 
 #ifdef ITEMTABLE_DEBUG
     int i, failed = 0;
@@ -857,6 +858,7 @@ PROCPS_EXPORT int procps_meminfo_new (
         return -errno;
     }
 
+    cur_secs = time(NULL);
     /* do a priming read here for the following potential benefits: |
          1) ensure there will be no problems with subsequent access |
          2) make delta results potentially useful, even if 1st time |
@@ -865,6 +867,7 @@ PROCPS_EXPORT int procps_meminfo_new (
         procps_meminfo_unref(&p);
         return -errno;
     }
+    p->sav_secs = cur_secs;
 
     *info = p;
     return 0;
