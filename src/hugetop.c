@@ -20,13 +20,20 @@
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
+#include <curses.h>
+
+/* ncurses provides good default signal handlers; see
+ * resizeterm(3ncurses) and "Signal Handlers" in initscr(3ncurses). */
+#ifndef NCURSES_VERSION
+#error sorry, but we require ncurses as the curses implementation
+#endif
+
 #include <ctype.h>
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <getopt.h>
 #include <locale.h>
-#include <ncurses.h>
 #include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -66,16 +73,12 @@ struct nodes_hg_states {
 	struct node_hg_states *nodes;
 };
 
-#define DEFAULT_COLS 80
-#define DEFAULT_ROWS 24
-static unsigned short cols = DEFAULT_COLS;
-static unsigned short rows = DEFAULT_ROWS;
-
 static int run_once;
 static int numa;
 static int human;
 static struct termios saved_tty;
-static long delay = 3;
+static const long default_delay = 3;
+static long delay = default_delay;
 
 enum pids_item Items[] = {
 	PIDS_ID_PID,
@@ -106,13 +109,17 @@ static void setup_hugepage()
 	/* 1, verify "Hugepagesize" from /proc/meminfo. is huge pages supported on kernel building? */
 	ret = procps_meminfo_new(&mem_info);
 	if (ret) {
-		fputs("Huge page not found or not supported", stdout);
-		exit(-ret);
+		fprintf(stderr, "%s: fatal error: kernel lacks huge"
+			" page support\n",
+			program_invocation_short_name);
+		exit(EXIT_FAILURE);
 	}
 
 	if (!MEMINFO_GET(mem_info, MEMINFO_MEM_HUGE_SIZE, ul_int)) {
-		fputs("Huge page not found or not supported", stdout);
-		exit(ENOTSUP);
+		fprintf(stderr, "%s: fatal error: kernel lacks huge"
+			" page support\n",
+			program_invocation_short_name);
+		exit(EXIT_FAILURE);
 	}
 
 	procps_meminfo_unref(&mem_info);
@@ -124,32 +131,11 @@ static void setup_hugepage()
 	 */
 	ret = stat("/sys/devices/system/node/node0/hugepages", &statbuf);
 	if (ret) {
-		fputs("Per NUMA node huge page attributes not supported", stdout);
-		exit(-ret);
+		fprintf(stderr, "%s: fatal error: kernel lacks per-NUMA"
+			" huge page attribute support\n",
+			program_invocation_short_name);
+		exit(EXIT_FAILURE);
 	}
-}
-
-/*
- * term_size - set the globals 'cols' and 'rows' to the current terminal size
- */
-static void term_size(int unusused __attribute__ ((__unused__)))
-{
-	struct winsize ws;
-
-	if ((ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) != -1) && ws.ws_row > 10) {
-		cols = ws.ws_col;
-		rows = ws.ws_row;
-	} else {
-		cols = DEFAULT_COLS;
-		rows = DEFAULT_ROWS;
-	}
-	if (run_once)
-		rows = USHRT_MAX;
-}
-
-static void sigint_handler(int unused __attribute__ ((__unused__)))
-{
-	delay = 0;
 }
 
 static void parse_input(char c)
@@ -177,19 +163,26 @@ static unsigned long hg_read_attribute(const char *dir, const char *hg, const ch
 	char path[PATH_MAX] = { 0 };
 	char buf[64] = { 0 };
 	int fd;
+	int err; // saved errno; curses _shouldn't_ clobber it, but...
 
 	snprintf(path, sizeof(path), "%s/%s/%s", dir, hg, attr);
 	fd = open(path, O_RDONLY);
 	if (fd == -1) {
-		printf("Failed to open %s\n", path);
-		resizeterm(rows, cols);
-		exit(errno);
+		err = errno;
+		endwin();
+		fprintf(stderr, "%s: unable to open \"%s\": %s\n",
+			program_invocation_short_name, path,
+			strerror(errno));
+		exit(EXIT_FAILURE);
 	}
 
 	if (read(fd, buf, sizeof(buf)) == -1) {
-		printf("Failed to read %s\n", path);
-		resizeterm(rows, cols);
-		exit(errno);
+		err = errno;
+		endwin();
+		fprintf(stderr, "%s: unable to read \"%s\": %s\n",
+			program_invocation_short_name, path,
+			strerror(errno));
+		exit(EXIT_FAILURE);
 	}
 
 	close(fd);
@@ -211,6 +204,7 @@ static void hg_states_one_node(struct node_hg_states *node, const char *name)
 	struct dirent *hg;
 	char path[PATH_MAX] = { 0 };
 	struct hg_state *state;
+	int err; // saved errno; curses _shouldn't_ clobber it, but...
 
 	memset(node, 0x00, sizeof(*node));
 	strncpy(node->node, name, sizeof(node->node) - 1);
@@ -219,9 +213,12 @@ static void hg_states_one_node(struct node_hg_states *node, const char *name)
 	snprintf(path, sizeof(path), "%s/%s/hugepages", SYS_NODES, name);
 	hg_dir = opendir(path);
 	if (!hg_dir) {
-		printf("Failed to open %s\n", path);
-		resizeterm(rows, cols);
-		exit(errno);
+		err = errno;
+		endwin();
+		fprintf(stderr, "%s: unable to open \"%s\": %s\n",
+			program_invocation_short_name, path,
+			strerror(errno));
+		exit(EXIT_FAILURE);
 	}
 
 	while ((hg = readdir(hg_dir))) {
@@ -253,12 +250,16 @@ static void hg_states_new(struct nodes_hg_states *nodes)
 	DIR *nodes_dir;
 	struct dirent *dirent;
 	struct node_hg_states *node;
+	int err; // saved errno; curses _shouldn't_ clobber it, but...
 
 	nodes_dir = opendir(SYS_NODES);
 	if (!nodes_dir) {
-		fputs("Failed to open " SYS_NODES, stdout);
-		resizeterm(rows, cols);
-		exit(errno);
+		err = errno;
+		endwin();
+		fprintf(stderr, "%s: unable to open \"%s\": %s\n",
+			program_invocation_short_name, SYS_NODES,
+			strerror(errno));
+		exit(EXIT_FAILURE);
 	}
 
 	while ((dirent = readdir(nodes_dir))) {
@@ -293,27 +294,27 @@ static void hg_states_free(struct nodes_hg_states *states)
 static void print_node(struct node_hg_states *node, int numa)
 {
 	struct hg_state *state;
-	char *line = calloc(cols, sizeof(char));
+	char *line = calloc(COLS, sizeof(char));
 	int bytes;
 
 	/* start build per node huge pages line. 'nodeX:' or 'node(s):' */
 	if (numa)
-		bytes = snprintf(line, cols, "%s:", node->node);
+		bytes = snprintf(line, COLS, "%s:", node->node);
 	else
-		bytes = snprintf(line, cols, "node(s):");
+		bytes = snprintf(line, COLS, "node(s):");
 
 	/* append ' 2.0Mi - xxx/yyy, 1.0Gi - mmm/nnn' */
 	for (unsigned int i = 0; i < node->nr_hg_state; i++) {
 		state = &node->state[i];
-		bytes += snprintf(line + bytes, cols - bytes, " %s - %ld/%ld",
+		bytes += snprintf(line + bytes, COLS - bytes, " %s - %ld/%ld",
 				scale_size(state->size, 3, 0, 1),
 				state->free_hugepages, state->nr_hugepages);
-		if (bytes >= cols)
+		if (bytes >= COLS)
 			break;
 
 		if (i < node->nr_hg_state - 1) {
-			bytes += snprintf(line + bytes, cols - bytes, ",");
-			if (bytes >= cols)
+			bytes += snprintf(line + bytes, COLS - bytes, ",");
+			if (bytes >= COLS)
 				break;
 		}
 	}
@@ -370,7 +371,7 @@ static void print_procs(void)
 	struct pids_stack *stack;
 	unsigned long long shared_hugepages;
 	unsigned long long private_hugepages;
-	char *line = calloc(cols, sizeof(char));
+	char *line = calloc(COLS, sizeof(char));
 	int bytes = 0;
 
 	procps_pids_new(&info, Items, ITEMS_COUNT);
@@ -385,11 +386,11 @@ static void print_procs(void)
 		/* XXX: we can't PRINT_line("", scale_size(), scale_size()...), because scale_size()
 		 *      uses a single static buffer, this statement overwrites buffer again.
 		 */
-		bytes = snprintf(line, cols, "%8d %10s",
+		bytes = snprintf(line, COLS, "%8d %10s",
 				PIDS_GETINT(PID), scale_size(shared_hugepages, 2, 0, human));
 
-		if (bytes < cols)
-			snprintf(line + bytes, cols - bytes, " %10s %s",
+		if (bytes < COLS)
+			snprintf(line + bytes, COLS - bytes, " %10s %s",
 				scale_size(private_hugepages, 2, 0, human), PIDS_GETSTR(CMD));
 
 		PRINT_line("%s\n", line);
@@ -399,27 +400,26 @@ static void print_procs(void)
 	free(line);
 }
 
-static void __attribute__ ((__noreturn__)) usage(FILE * out)
+static void __attribute__ ((__noreturn__)) usage(FILE * stream)
 {
-	fputs(USAGE_HEADER, out);
-	fprintf(out, _(" %s [options]\n"), program_invocation_short_name);
-	fputs(USAGE_OPTIONS, out);
-	fputs(_(" -d, --delay <secs>  delay updates\n"), out);
-	fputs(_(" -n, --numa          display per NUMA nodes Huge pages information\n"), out);
-	fputs(_(" -o, --once          only display once, then exit\n"), out);
-	fputs(_(" -H, --human         display human-readable output\n"), out);
-	fputs(USAGE_SEPARATOR, out);
-	fputs(USAGE_HELP, out);
-	fputs(USAGE_VERSION, out);
+	fputs(USAGE_HEADER, stream);
+	fprintf(stream, _(" %s [-Hno] [-d SECS]\n"), program_invocation_short_name);
+	fputs(USAGE_OPTIONS, stream);
+	fprintf(stream, _(" -d SECS, --delay SECS  delay SECS seconds between updates (default: %ld)\n"), default_delay);
+	fputs(_(" -n, --numa             display per-NUMA node huge page information\n"), stream);
+	fputs(_(" -o, --once             display once then exit\n"), stream);
+	fputs(_(" -H, --human            display human-readable output\n"), stream);
+	fputs(USAGE_SEPARATOR, stream);
+	fputs(USAGE_HELP, stream);
+	fputs(USAGE_VERSION, stream);
 
-	exit(out == stderr ? EXIT_FAILURE : EXIT_SUCCESS);
+	exit(stream == stderr ? 2 : EXIT_SUCCESS);
 }
 
 int main(int argc, char **argv)
 {
 	int is_tty = isatty(STDIN_FILENO);
 	int o;
-	unsigned short old_rows;
 
 	static const struct option longopts[] = {
 		{ "delay",      required_argument, NULL, 'd' },
@@ -476,12 +476,8 @@ int main(int argc, char **argv)
 		if (is_tty && tcgetattr(STDIN_FILENO, &saved_tty) == -1)
 			warn(_("terminal setting retrieval"));
 
-		old_rows = rows;
-		term_size(0);
 		initscr();
-		resizeterm(rows, cols);
-		signal(SIGWINCH, term_size);
-		signal(SIGINT, sigint_handler);
+		curs_set(0);
 	}
 
 	do {
@@ -497,16 +493,11 @@ int main(int argc, char **argv)
 			break;
 		}
 
-		if (old_rows != rows) {
-			resizeterm(rows, cols);
-			old_rows = rows;
-		}
-
 		move(0, 0);
 		print_summary();
-		attron(A_REVERSE);
 		print_headings();
-		attroff(A_REVERSE);
+		move(2, 0);
+		chgat(-1, A_STANDOUT, 0 /* default color pair*/, NULL);
 		print_procs();
 
 		refresh();

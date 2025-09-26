@@ -7,55 +7,82 @@
 .\" (at your option) any later version.
 .\"
 .\"
-.TH HUGETOP 1 2024-01-18 procps-ng
+.TH HUGETOP 1 2024-12-16 procps-ng
 .SH NAME
 hugetop \- report huge page information
 .SH SYNOPSIS
 .B hugetop
-.RI [ option " .\|.\|.]"
-.SH DESCRIPTION
-The
+.RB [ \-d
+.IR n ]
+.RB [ \-Hn ]
+.P
 .B hugetop
-command reports the huge page information of system and processes. It displays
-a summary of the system huge page status. For each process that has at
-least one huge page, the number of private and shared pages, along with
-the process PID and command name are displayed.
+.RB [ \-Hon ]
+.SH DESCRIPTION
+.B hugetop
+reports the system's huge page reservations and usage.
+It displays a summary of the system's huge page allocations.
+For each process that has at least one huge page,
+it lists
+the number of private and shared pages,
+along with the associated PID and command name.
+.P
+By default,
+.B \%hugetop
+presents a full-screen
+.BR top (1)-like
+interface that refreshes every three seconds.
+Press \[lq]q\[rq] to quit.
 .SH OPTIONS
+.B \-h
+and
+.B \-\-help
+display a usage message,
+while
+.B \-v
+and
+.B \%\-\-version
+show version information;
+all exit afterward.
 .TP
-\fB\-d\fR, \fB\-\-delay\fR=\fIN\fR
+.BI \-\-delay= n
+.TQ
+.BI \-d\~ n
 Refresh the display every
 .I n
-in seconds.  By default,
-.B hugetop
-refreshes the display every three seconds.  To exit the program, hit
-.BR q .
-This cannot be combined with the \fB-o\fR option.
+seconds.
+Ignored if
+.B \-o
+is also specified.
 .TP
-\fB\-n\fR, \fB\-\-numa\fR
-Display per NUMA node huge page information.
+.B \-\-human
+.TQ
+.B \-H
+Use human-readable units.
 .TP
-\fB\-o\fR, \fB\-\-once\fR
-Display the output once and then exit.
+.B \-\-numa
+.TQ
+.B \-n
+Display per-NUMA-node huge page information.
 .TP
-\fB\-H\fR, \fB\-\-human\fR
-Display human-readable output.
-.TP
-\fB\-h\fR, \fB\-\-help\fR
-Display help text and exit.
-.TP
-\fB\-V\fR, \fB\-\-version\fR
-Display version information and exit.
+.B \-\-once
+.TQ
+.B \-o
+Write one report to the standard output stream,
+without launching the full-screen interface,
+then exit.
 .SH "EXIT STATUS"
-.PP
-.RS
-.PD 0
 .TP
 .B 0
-Success.
+The program operated successfully.
 .TP
-.B Others
-Errno.
-.PD
+.B 1
+The system lacks support for the huge page feature,
+or a system call or library function failed;
+a diagnostic message reports specifics.
+.TP
+.B 2
+The program could not interpret its command-line arguments.
 .SH AUTHOR
 zhenwei pi <pizhenwei@bytedance.com>
 .SH "SEE ALSO"
