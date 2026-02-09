@@ -55,6 +55,7 @@
 #define FREE_REPEATCOUNT	(1 << 7)
 #define FREE_COMMITTED		(1 << 8)
 #define FREE_LINE		(1 << 9)
+#define FREE_CONTAINER		(1 << 10)
 
 struct commandline_arguments {
 	int exponent;		/* demanded in kilos, magas... */
@@ -92,6 +93,7 @@ static void __attribute__ ((__noreturn__))
 	fputs(_(" -s N, --seconds N   repeat printing every N seconds\n"), out);
 	fputs(_(" -c N, --count N     repeat printing N times, then exit\n"), out);
 	fputs(_(" -w, --wide          wide output\n"), out);
+	fputs(_("     --container     show container memory info\n"), out);
 	fputs(USAGE_SEPARATOR, out);
 	fputs(_("     --help     display this help and exit\n"), out);
 	fputs(USAGE_VERSION, out);
@@ -156,6 +158,7 @@ int main(int argc, char **argv)
 		PETA_OPTION,
 		TEBI_OPTION,
 		PEBI_OPTION,
+		CONTAINER_OPTION,
 		HELP_OPTION
 	};
 
@@ -180,6 +183,7 @@ int main(int argc, char **argv)
 		{  "seconds",	required_argument,  NULL,  's'		},
 		{  "count",	required_argument,  NULL,  'c'		},
 		{  "wide",	no_argument,	    NULL,  'w'		},
+		{  "container",	no_argument,	NULL,  CONTAINER_OPTION },
 		{  "help",	no_argument,	    NULL,  HELP_OPTION	},
 		{  "version",	no_argument,	    NULL,  'V'		},
 		{  NULL,	0,		    NULL,  0		}
@@ -287,6 +291,9 @@ int main(int argc, char **argv)
 		case 'w':
 			flags |= FREE_WIDE;
 			break;
+		case CONTAINER_OPTION:
+			flags |= FREE_CONTAINER;
+			break;
 		case HELP_OPTION:
 			usage(stdout);
 		case 'V':
@@ -298,7 +305,13 @@ int main(int argc, char **argv)
 	if (optind != argc)
 	    usage(stderr);
 
-	if ( (rc = procps_meminfo_new(&mem_info)) < 0)
+	if (flags & FREE_CONTAINER) {
+		rc = cgroup_meminfo_new(&mem_info);
+	} else {
+		rc = procps_meminfo_new(&mem_info);
+	}
+
+	if (rc < 0)
     {
         if (rc == -ENOENT)
             errx(EXIT_FAILURE,
