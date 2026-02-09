@@ -623,9 +623,12 @@ static int WriteSetting(
             if (0 < fprintf(fp, "%s\n", value))
                 rc = EXIT_SUCCESS;
             if (close_stream(fp) != 0) {
-                warn(_("setting key \"%s\""), dotted_key);
+                warn(_("setting key \"%s\"%s"),
+                     dotted_key, (ignore_failure?_(", ignoring"):""));
 		free(dotted_key);
-                return EXIT_FAILURE;
+                if (!ignore_failure)
+                    rc = EXIT_FAILURE;
+                return rc;
             }
         }
     }
