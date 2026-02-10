@@ -46,6 +46,7 @@
 #include <inttypes.h>
 #include <locale.h>
 #include <signal.h>
+#include <stdbool.h>
 #include <sys/ioctl.h>
 #include <sys/time.h>
 #include <sys/wait.h>
