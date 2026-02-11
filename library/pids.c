@@ -1039,9 +1039,15 @@ static inline int pids_items_check_failed (
      * if (procps_pids_new(&info, PIDS_noop, 3) < 0)
      *                            ^~~~~~~~~~~~~~~~
      */
+/* (void*)items=0x3010<(void*)0x8000 causing FAIL:procps_pids new then unref */
+#ifdef __GNU__
+    if (numitems < 1)
+        return 1;
+#else
     if (numitems < 1
     || (void *)items < (void *)0x8000)      // twice as big as our largest enum
         return 1;
+#endif
 
     for (i = 0; i < numitems; i++) {
         // a pids_item is currently unsigned, but we'll protect our future
@@ -1523,8 +1529,10 @@ fresh_start:
         pids_containers_check();
 
     info->boot_tics = 0;
+#ifdef CLOCK_BOOTTIME
     if (0 >= clock_gettime(CLOCK_BOOTTIME, &ts))
         info->boot_tics = (ts.tv_sec + ts.tv_nsec * 1.0e-9) * info->hertz;
+#endif
 
     if (NULL == info->read_something(info->get_PT, &info->get_proc))
         return NULL;
@@ -1567,8 +1575,10 @@ PROCPS_EXPORT struct pids_fetch *procps_pids_reap (
     info->read_something = which ? readeither : readproc;
 
     info->boot_tics = 0;
+#ifdef CLOCK_BOOTTIME
     if (0 >= clock_gettime(CLOCK_BOOTTIME, &ts))
         info->boot_tics = (ts.tv_sec + ts.tv_nsec * 1.0e-9) * info->hertz;
+#endif
 
     rc = pids_stacks_fetch(info);
 
@@ -1676,8 +1686,10 @@ PROCPS_EXPORT struct pids_fetch *procps_pids_select (
     info->read_something = (which & PIDS_FETCH_THREADS_TOO) ? readeither : readproc;
 
     info->boot_tics = 0;
+#ifdef CLOCK_BOOTTIME
     if (0 >= clock_gettime(CLOCK_BOOTTIME, &ts))
         info->boot_tics = (ts.tv_sec + ts.tv_nsec * 1.0e-9) * info->hertz;
+#endif
 
     rc = pids_stacks_fetch(info);
 
