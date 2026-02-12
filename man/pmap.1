@@ -32,19 +32,25 @@ command reports the memory map of a process or processes.
 \fB\-x\fR, \fB\-\-extended\fR
 Show the extended format.
 .TP
+\fB\-f\fR,\fB\-\-fields\fR \fIfield\fR[,...]
+Show only the specified fields.
+.TP
+\fB\-H\fR,\fB\-\-list\-fields\fR
+List available fields that can be used with \fB\-f\fR option.
+.TP
 \fB\-d\fR, \fB\-\-device\fR
 Show the device format.
 .TP
 \fB\-q\fR, \fB\-\-quiet\fR
 Do not display some header or footer lines.
 .TP
-\fB\-A\fR, \fB\-\-range\fR \fIlow\fR,\fIhigh\fR
+\fB\-A\fR, \fB\-\-range\fR \fIlow\fR[,\fIhigh\fR]
 Limit results to the given range to
 .I low
 and
 .I high
-address range.  Notice that the low and high arguments are single string
-separated with comma.
+address range.  Notice that the \fIlow\fR and \fIhigh\fR arguments are single string
+separated with comma. \fIhigh\fR can be omitted.
 .TP
 \fB\-X\fR
 Show even more details than the \fB\-x\fR option. WARNING: format changes

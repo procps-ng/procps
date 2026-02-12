@@ -128,6 +128,7 @@ usage(FILE * out)
 	fputs(_(" -n, --create-rc             create new default rc\n"), out);
 	fputs(_(" -N, --create-rc-to=<file>   create new rc to file\n"), out);
 	fputs(_("            NOTE: pid arguments are not allowed with -n, -N\n"), out);
+	fputs(_(" -f, --fields=field[,...]    show the specified field(s)\n"), out);
 	fputs(_(" -d, --device                show the device format\n"), out);
 	fputs(_(" -q, --quiet                 do not display header and footer\n"), out);
 	fputs(_(" -p, --show-path             show path in the mapping\n"), out);
@@ -135,6 +136,7 @@ usage(FILE * out)
 	fputs(_(" -A, --range=<low>[,<high>]  limit results to the given range\n"), out);
 	fputs(USAGE_SEPARATOR, out);
 	fputs(USAGE_HELP, out);
+	fputs(_(" -H, --list-fields           list field names\n"), out);
 	fputs(USAGE_VERSION, out);
 	fprintf(out, USAGE_MAN_TAIL("pmap(1)"));
 	exit(out == stderr ? EXIT_FAILURE : EXIT_SUCCESS);
@@ -148,6 +150,7 @@ static unsigned long range_high = ~0ul;
 static int c_option = 0;
 static int C_option = 0;
 static int d_option = 0;
+static int f_option = 0;
 static int n_option = 0;
 static int N_option = 0;
 static int q_option = 0;
@@ -285,7 +288,7 @@ struct cnf_listnode {
 	struct cnf_listnode *next;
 };
 
-static struct cnf_listnode *cnf_listhead=NULL, *cnf_listnode;
+static struct cnf_listnode *cnf_listhead=NULL;
 
 static int is_unimportant (const char *s)
 {
@@ -303,9 +306,11 @@ static int is_unimportant (const char *s)
 /* check, whether we want to display the field or not */
 static int is_enabled (const char *s)
 {
+	struct cnf_listnode *cnf_listnode;
+
 	if (X_option == 1) return !is_unimportant(s);
 
-	if (c_option) {  /* taking the list of disabled fields from the rc file */
+	if (f_option) {  /* taking the list of disabled fields from the rc file */
 
 		for (cnf_listnode = cnf_listhead; cnf_listnode; cnf_listnode = cnf_listnode -> next) {
 			if (!strcmp(s, cnf_listnode -> description)) return 1;
@@ -317,6 +322,85 @@ static int is_enabled (const char *s)
 	return 1;
 }
 
+static int enable(const char *token)
+{
+	/* add the field in the list */
+	struct cnf_listnode *cnf_listnode;
+
+	if (!(cnf_listnode = calloc(1, sizeof *cnf_listnode)))
+		return 0;
+
+	snprintf(cnf_listnode -> description, sizeof(cnf_listnode -> description), "%s", token);
+	cnf_listnode -> next = cnf_listhead;
+	cnf_listhead = cnf_listnode;
+	return 1;
+}
+
+static void enable_list (char *list)
+{
+	char *token;
+
+	token = strtok(list, ",");
+	while (token && *token) {
+		if (!enable(token))
+			errx(EXIT_FAILURE, _("memory allocation failed"));
+		token = strtok(NULL, ",");
+	}
+}
+
+static void skip_line(FILE *f)
+{
+	int c;
+
+	while ((c = getc(f)) != EOF) {
+		if (c == '\n')
+			break;
+	}
+}
+
+static int print_line_prefix(FILE *f)
+{
+	int c = getc(f);
+
+	if (c == EOF)
+		return 0;
+
+	if ('0' <= c && c <= '9')
+		return 0;
+
+	do {
+		putchar(c);
+		c = getc(f);
+		if (c == ':') {
+			putchar('\n');
+			skip_line(f);
+			return 1;
+		}
+	} while (c != EOF);
+	return 0;
+}
+
+static int __attribute__ ((__noreturn__))
+print_field_names (void)
+{
+	FILE *f;
+
+	puts(nls_Address);
+	puts(nls_Perm);
+	puts(nls_Offset);
+	puts(nls_Device);
+	puts(nls_Inode);
+	puts(nls_Mapping);
+
+	f = fopen("/proc/self/smaps", "r");
+	if (!f)
+		err(EXIT_FAILURE, _("failed to open /proc/self/maps"));
+	skip_line (f);
+	while (print_line_prefix(f));
+	fclose(f);
+
+	exit(EXIT_SUCCESS);
+}
 
 static void print_extended_maps (FILE *f)
 {
@@ -328,6 +412,7 @@ static void print_extended_maps (FILE *f)
 	int maxw1=0, maxw2=0, maxw3=0, maxw4=0, maxw5=0, maxwv=0;
 	int nfields, firstmapping, footer_gap, i, maxw_;
 	char *ret, *map_basename, c, has_vmflags = 0;
+	int in_range;
 
 	ret = fgets(mapbuf, sizeof mapbuf, f);
 	firstmapping = 2;
@@ -350,6 +435,18 @@ static void print_extended_maps (FILE *f)
 			if (!ret || !mapbuf[0])
 				errx(EXIT_FAILURE, _("Unknown format in smaps file!"));
 			c = mapbuf[strlen(mapbuf) - 1];
+		}
+
+		in_range = 1;
+		{
+			unsigned long start_n, end_n;
+			start_n = strtoul(start, NULL, 16);
+			end_n = strtoul(end, NULL, 16);
+
+			if (end_n - 1 < range_low)
+				in_range = 0;
+			if (range_high < start_n)
+				in_range = 0;
 		}
 
 		/* Store maximum widths for printing nice later */
@@ -396,11 +493,13 @@ static void print_extended_maps (FILE *f)
 			strcpy(listnode->value_str, value_str);
 			sscanf(value_str, "%lu", &listnode->value);
 			if (firstmapping == 2) {
-				listnode->total += listnode->value;
-				if (q_option) {
-					maxw_ = strlen(listnode->value_str);
-					if (maxw_ > listnode->max_width)
-						listnode->max_width = maxw_;
+				if (in_range) {
+					listnode->total += listnode->value;
+					if (q_option) {
+						maxw_ = strlen(listnode->value_str);
+						if (maxw_ > listnode->max_width)
+							listnode->max_width = maxw_;
+					}
 				}
 			}
 			listnode = listnode->next;
@@ -468,6 +567,9 @@ loop_end:
 					printf("\n");
 			}
 
+			if (!in_range)
+				goto skip_this_data;
+
 			/* Print data */
 			printf("%*s", maxw1, start);    /* Address field is always enabled */
 
@@ -505,6 +607,7 @@ loop_end:
 
 			printf("\n");
 
+		  skip_this_data:
 			firstmapping = 0;
 
 		}
@@ -564,7 +667,7 @@ static int one_proc (struct pids_stack *p, unsigned use_kname)
 
 	printf("%u:   %s\n", PIDS_VAL(tgid, s_int, p), PIDS_VAL(cmdline, str, p));
 
-	if (x_option || X_option || c_option) {
+	if (x_option || X_option || f_option) {
 		snprintf(buf, sizeof buf, "/proc/%u/smaps", PIDS_VAL(tgid, s_int, p));
 		if ((fp = fopen(buf, "r")) == NULL)
 			return 1;
@@ -574,7 +677,7 @@ static int one_proc (struct pids_stack *p, unsigned use_kname)
 			return 1;
 	}
 
-	if (X_option || c_option) {
+	if (X_option || f_option) {
 		print_extended_maps(fp);
         fclose(fp);
 		return 0;
@@ -827,6 +930,7 @@ static int config_read (char *rc_filename)
 	int length;
 	char *tail, *token;
 	int line_cnt, section_id;
+	struct cnf_listnode *cnf_listnode;
 
 	f = fopen(rc_filename, "r");
 
@@ -897,15 +1001,11 @@ static int config_read (char *rc_filename)
 						warnx(_("syntax error found in the config - line %d"), line_cnt);
 					}
 
-					/* add the field in the list */
-					if (!(cnf_listnode = calloc(1, sizeof *cnf_listnode))) {
+					if (!enable(token)) {
 						warnx(_("memory allocation failed"));
 						fclose(f);
 						return 0;
 					}
-					snprintf(cnf_listnode -> description, sizeof(cnf_listnode -> description), "%s", token);
-					cnf_listnode -> next = cnf_listhead;
-					cnf_listhead = cnf_listnode;
 				}
 
 				break;
@@ -1040,6 +1140,7 @@ int main(int argc, char **argv)
 	int ret = 0, c, conf_ret;
 	char *rc_filename = NULL;
 	unsigned use_kname = 0;
+	struct cnf_listnode *cnf_listnode;
 
 	static const struct option longopts[] = {
 		{"extended", no_argument, NULL, 'x'},
@@ -1054,6 +1155,8 @@ int main(int argc, char **argv)
 		{"create-rc-to", required_argument, NULL, 'N'},
 		{"show-path", no_argument, NULL, 'p'},
 		{"use-kernel-name", no_argument, NULL, 'k'},
+		{"fields", required_argument, NULL, 'f'},
+		{"list-fields", required_argument, NULL, 'H'},
 		{NULL, 0, NULL, 0}
 	};
 
@@ -1066,7 +1169,7 @@ int main(int argc, char **argv)
 	if (argc < 2)
 		usage(stderr);
 
-	while ((c = getopt_long(argc, argv, "xXrdqA:hVcC:nN:pk", longopts, NULL)) != -1)
+	while ((c = getopt_long(argc, argv, "xXrdqA:hVcC:nN:pkf:H", longopts, NULL)) != -1)
 		switch (c) {
 		case 'x':
 			x_option = 1;
@@ -1111,6 +1214,13 @@ int main(int argc, char **argv)
 		case 'k':
 			use_kname = 1;
 			break;
+		case 'f':
+			f_option = 1;
+			enable_list(optarg);
+			break;
+		case 'H':
+			print_field_names();
+			break;
 		case 'a':	/* Sun prints anon/swap reservations */
 		case 'F':	/* Sun forces hostile ptrace-like grab */
 		case 'l':	/* Sun shows unresolved dynamic names */
@@ -1124,8 +1234,8 @@ int main(int argc, char **argv)
 	argc -= optind;
 	argv += optind;
 
-	if (c_option + C_option + d_option + n_option + N_option + x_option + !!X_option > 1)
-		errx(EXIT_FAILURE, _("options -c, -C, -d, -n, -N, -x, -X are mutually exclusive"));
+	if (c_option + C_option + d_option + f_option + n_option + N_option + x_option + !!X_option > 1)
+		errx(EXIT_FAILURE, _("options -c, -C, -d, -F, -n, -N, -x, -X are mutually exclusive"));
 
 	if ((n_option || N_option) && (q_option || map_desc_showpath))
 		errx(EXIT_FAILURE, _("options -p, -q are mutually exclusive with -n, -N"));
@@ -1163,6 +1273,8 @@ int main(int argc, char **argv)
 	if (C_option) c_option = 1;
 
 	if (c_option) {
+		f_option = 1;
+
 		if (!C_option) rc_filename = get_default_rc_filename();
 
 		if (!rc_filename) return(EXIT_FAILURE);
