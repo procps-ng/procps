@@ -1745,7 +1745,11 @@ int look_up_our_self(void) {
     int fd;
 
     memset(&p, 0, sizeof(proc_t));
+#ifdef O_PATH
     fd = open("/proc/self", O_PATH|O_DIRECTORY);
+#else
+    fd = open("/proc/self", O_DIRECTORY);
+#endif
     if(fd < 0 || file2str(fd, "stat", &ub) == -1) {
         fprintf(stderr, "Error, do this: mount -t proc proc /proc\n");
         _exit(47);
