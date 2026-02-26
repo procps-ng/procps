@@ -356,7 +356,7 @@ AC_ARG_ENABLE([w],
 )
 AM_CONDITIONAL(BUILD_W, test "x$enable_w" = xyes)
 
-AM_CONDITIONAL(LINUX, test "x$host_os" = xlinux-gnu)
+AM_CONDITIONAL(LINUX, test "x$host_os" = xlinux-gnu -o "x$host_os" = xlinux-musl)
 AM_CONDITIONAL(CYGWIN, test "x$host_os" = xcygwin)
 
 AC_ARG_ENABLE([skill],
