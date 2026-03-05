@@ -2847,6 +2847,8 @@ static void *tasks_refresh (void *unused) {
 #ifdef THREADED_TSK
       sem_wait(&Semaphore_tasks_beg);
 #endif
+
+#ifdef CLOCK_BOOTTIME
       if (0 != clock_gettime(CLOCK_BOOTTIME, &ts))
          Frame_etscale = 0;
       else {
@@ -2857,6 +2859,10 @@ static void *tasks_refresh (void *unused) {
          // if in Solaris mode, adjust our scaling for all cpus
          Frame_etscale = 100.0f / ((float)Hertz * (float)et * (Rc.mode_irixps ? 1 : Cpu_cnt));
       }
+#else
+         Frame_etscale = 0;
+
+#endif
       what = Thread_mode ? PIDS_FETCH_THREADS_TOO : PIDS_FETCH_TASKS_ONLY;
       if (Monpidsidx) {
          what |= PIDS_SELECT_PID;
