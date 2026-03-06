@@ -2358,7 +2358,7 @@ static void calibrate_fields (void) {
             // oops, won't fit -- we're outta here...
             if (Screen_cols < ((int)(s - w->columnhdr) + len)) break;
             if (VARcol(f)) { ++varcolcnt; w->varcolsz += strlen(h); }
-            s = scat(s, fmtmk("%*.*s", len, len, h));
+            s = scat(s, utf8_justify(N_col(f) , len, CHKw(w, Fieldstab[f].align)));
          }
 #ifndef USE_X_COLHDR
          if (i >= 1 && EU_XON == w->procflgs[i - 1]) --i;
@@ -2384,7 +2384,9 @@ static void calibrate_fields (void) {
             h = N_col(f);
             len = (VARcol(f) ? (int)strlen(h) : Fieldstab[f].width) + COLPADSIZ;
             if (Screen_cols < ((int)(s - w->columnhdr) + len)) break;
-            s = scat(s, fmtmk("%*.*s", len, len, h));
+            s = scat(s, utf8_justify(N_col(f)
+               , VARcol(f) ? w->varcolsz : Fieldstab[f].width
+               , CHKw(w, Fieldstab[f].align)));
             w->endpflg = i;
          }
 #ifndef USE_X_COLHDR
