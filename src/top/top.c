@@ -756,8 +756,8 @@ static int utf8_embody (const char *str, int width) {
          * can accommodate the multi-byte translated strings */
 static const char *utf8_justify (const char *str, int width, int justr) {
    static char l_fmt[]  = "%-*.*s%s", r_fmt[] = "%*.*s%s";
-   static char buf[SCREENMAX];
-   char tmp[SCREENMAX];
+   static char buf[SCREEN_BYTES_MAX];
+   char tmp[SCREEN_BYTES_MAX];
 
    snprintf(tmp, sizeof(tmp), "%.*s", utf8_embody(str, width), str);
    width += utf8_delta(tmp);
@@ -1629,7 +1629,7 @@ static const char *user_certify (WIN_t *q, const char *str, char typ) {
          * Just do some justify stuff, then add post column padding. */
 static inline const char *justify_pad (const char *str, int width, int justr) {
    static char l_fmt[]  = "%-*.*s%s", r_fmt[] = "%*.*s%s";
-   static char buf[SCREENMAX];
+   static char buf[SCREEN_BYTES_MAX];
 
    snprintf(buf, sizeof(buf), justr ? r_fmt : l_fmt, width, width, str, COLPADSTR);
    return buf;
@@ -1672,7 +1672,7 @@ end_justifies:
          * Make and then justify a character string,
          * and include a visual clue should truncation be necessary. */
 static inline const char *make_str (const char *str, int width, int justr, int col) {
-   static char buf[SCREENMAX];
+   static char buf[SCREEN_BYTES_MAX];
 
    if (width < snprintf(buf, sizeof(buf), "%s", str)) {
       if (width <= 0 || (size_t)width >= sizeof(buf))
@@ -1689,7 +1689,7 @@ static inline const char *make_str (const char *str, int width, int justr, int c
          * Make and then justify a potentially multi-byte character string,
          * and include a visual clue should truncation be necessary. */
 static inline const char *make_str_utf8 (const char *str, int width, int justr, int col) {
-   static char buf[SCREENMAX];
+   static char buf[SCREEN_BYTES_MAX];
    int delta = utf8_delta(str);
 
    if (width + delta < snprintf(buf, sizeof(buf), "%s", str)) {
@@ -2084,7 +2084,7 @@ static void adj_geometry (void) {
 #endif
 
    // we might disappoint some folks (but they'll deserve it)
-   if (Screen_cols > SCREENMAX) Screen_cols = SCREENMAX;
+   if (Screen_cols > SCREEN_WIDTH_MAX) Screen_cols = SCREEN_WIDTH_MAX;
    if (Screen_cols < W_MIN_COL) Screen_cols = W_MIN_COL;
 
    if (!w_set) {
@@ -2107,11 +2107,11 @@ static void adj_geometry (void) {
             if (!*ep && (t > 0) && (t <= 0x7fffffffL)) tr = t;
             if (0 < tr) w_rows = (int)tr;
          }
-         if (!w_cols) w_cols = SCREENMAX;
+         if (!w_cols) w_cols = SCREEN_WIDTH_MAX;
          if (w_cols && w_cols < W_MIN_COL) w_cols = W_MIN_COL;
          if (w_rows && w_rows < W_MIN_ROW) w_rows = W_MIN_ROW;
       }
-      if (w_cols > SCREENMAX) w_cols = SCREENMAX;
+      if (w_cols > SCREEN_WIDTH_MAX) w_cols = SCREEN_WIDTH_MAX;
       w_set = 1;
    }
 
@@ -3208,7 +3208,7 @@ static void insp_mkrow_raw (int col, int row) {
 #endif
  #define mkSTD { capNO; if (++to <= Screen_cols) { static char _str[2]; \
     _str[0] = uch; putp(_str); } }
-   unsigned char tline[SCREENMAX];
+   unsigned char tline[SCREEN_BYTES_MAX];
    int fr, to, ofs;
    int hicap = 0;
 
@@ -3476,7 +3476,7 @@ static void inspection_utility (int pid) {
       for (i = 0; i < Inspect.total; i++) { char _s[SMLBUFSIZ]; \
          snprintf(_s, sizeof(_s), " %s %s", Inspect.tab[i].name, Inspect.tab[i].caps); \
          strncat(dst, _s, (sizeof(dst) - 1) - strlen(dst)); } }
-   char sels[SCREENMAX];
+   char sels[SCREEN_BYTES_MAX];
    static int sel;
    int i, key;
    struct pids_stack *p;
@@ -4231,7 +4231,7 @@ static const char *configs_file (FILE *fp, const char *name, float *delay) {
    (void)fscanf(fp, "\n");
    (void)fscanf(fp, "Fixed_widest=%d, Summ_mscale=%d, Task_mscale=%d, Zero_suppress=%d, Tics_scaled=%d\n"
       , &Rc.fixed_widest, &Rc.summ_mscale, &Rc.task_mscale, &Rc.zero_suppress,  &Rc.tics_scaled);
-   if (Rc.fixed_widest < -1 || Rc.fixed_widest > SCREENMAX)
+   if (Rc.fixed_widest < -1 || Rc.fixed_widest > SCREEN_WIDTH_MAX)
       Rc.fixed_widest = 0;
    if (Rc.summ_mscale < 0   || Rc.summ_mscale > SK_Eb)
       Rc.summ_mscale = 0;
@@ -4529,7 +4529,7 @@ static void parse_args (int argc, char **argv) {
             bye_bye(NULL);
          case 'w':
             tmp = -1;
-            if (cp && (!mkfloat(cp, &tmp, 1) || tmp < W_MIN_COL || tmp > SCREENMAX))
+            if (cp && (!mkfloat(cp, &tmp, 1) || tmp < W_MIN_COL || tmp > SCREEN_WIDTH_MAX))
                error_exit(fmtmk(N_fmt(BAD_widtharg_fmt), cp));
             Width_mode = (int)tmp;
             continue;
@@ -5301,7 +5301,7 @@ static int bot_focus_str (const char *hdr, const char *str) {
 static int bot_focus_strv (const char *hdr, const char **strv) {
  #define maxRSVD ( Screen_rows - 1 )
    static int nsav;
-   char tmp[SCREENMAX], *p;
+   char tmp[SCREEN_BYTES_MAX], *p;
    size_t n;
    int i, x;
 
@@ -5616,7 +5616,7 @@ static void other_filters (int ch) {
          break;
       case kbd_CtrlO:
          if (VIZCHKw(w)) {
-            char buf[SCREENMAX], **pp;
+            char buf[SCREEN_BYTES_MAX], **pp;
             struct osel_s *osel;
             int i;
 
@@ -5874,7 +5874,7 @@ static void keys_global (int ch) {
       case 'X':
          num = get_int(fmtmk(N_fmt(XTRA_fixwide_fmt), Rc.fixed_widest));
          if (num > GET_NUM_NOT) {
-            if (num >= 0 && num <= SCREENMAX) Rc.fixed_widest = num;
+            if (num >= 0 && num <= SCREEN_WIDTH_MAX) Rc.fixed_widest = num;
             else Rc.fixed_widest = -1;
          }
          break;

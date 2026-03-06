@@ -142,7 +142,9 @@ char *strcasestr(const char *haystack, const char *needle);
 
         /* Miscellaneous buffers with liberal values and some other defines
            -- mostly just to pinpoint source code usage/dependencies */
-#define SCREENMAX   512
+#define SCREEN_WIDTH_MAX 512
+        /*  worst case: 4-byte 0-width, 4 more spaces are needed */
+#define SCREEN_BYTES_MAX (SCREEN_WIDTH_MAX*4)
    /* the above might seem pretty stingy, until you consider that with every
       field displayed the column header would be approximately 250 bytes
       -- so SCREENMAX provides for all fields plus a 250+ byte command line */
@@ -152,7 +154,7 @@ char *strcasestr(const char *haystack, const char *needle);
 #define PFLAGSSIZ   128
 #define SMLBUFSIZ   128
 #define MEDBUFSIZ   256
-#define LRGBUFSIZ   512
+#define LRGBUFSIZ   (512*4)
 #define OURPATHSZ  1024
 #define BIGBUFSIZ  2048
 #define BOTBUFSIZ 16384
@@ -160,8 +162,8 @@ char *strcasestr(const char *haystack, const char *needle);
 #define MAXBUFSIZ (1024*64*2)
    /* in addition to the actual display data, our row might have to accommodate
       many termcap/color transitions - these definitions ensure we have room */
-#define ROWMINSIZ  ( SCREENMAX +  8 * (CAPBUFSIZ + CLRBUFSIZ) )
-#define ROWMAXSIZ  ( SCREENMAX + 16 * (CAPBUFSIZ + CLRBUFSIZ) )
+#define ROWMINSIZ  ( SCREEN_BYTES_MAX +  8 * (CAPBUFSIZ + CLRBUFSIZ) )
+#define ROWMAXSIZ  ( SCREEN_BYTES_MAX + 16 * (CAPBUFSIZ + CLRBUFSIZ) )
    // minimum size guarantee for dynamically acquired 'readfile' buffer
 #define READMINSZ  2048
    // size of preallocated search string buffers, same as ioline()
@@ -400,7 +402,7 @@ typedef struct WIN_t {
 #ifdef USE_X_COLHDR
           columnhdr [ROWMINSIZ],       // column headings for procflgs
 #else
-          columnhdr [SCREENMAX],       // column headings for procflgs
+          columnhdr [SCREEN_BYTES_MAX],// column headings for procflgs
 #endif
          *captab [CAPTABMAX];          // captab needed by show_special()
    struct osel_s *osel_1st;            // other selection criteria anchor
@@ -649,8 +651,8 @@ typedef struct WIN_t {
 #if defined(RECALL_FIXED) && defined(TERMIOS_ONLY)
 # error 'RECALL_FIXED' conflicts with 'TERMIOS_ONLY'
 #endif
-#if (LRGBUFSIZ < SCREENMAX)
-# error 'LRGBUFSIZ' must NOT be less than 'SCREENMAX'
+#if (LRGBUFSIZ < SCREEN_BYTES_MAX)
+# error 'LRGBUFSIZ' must NOT be less than 'SCREEN_BYTES_MAX'
 #endif
 #if defined(PRETENDECORE) && defined(CORE_TYPE_NO)
 # error 'PRETENDECORE' conflicts with 'CORE_TYPE_NO'
