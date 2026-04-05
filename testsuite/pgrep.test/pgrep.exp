@@ -194,3 +194,55 @@ expect_pass "$test" "''"
 
 file delete $pidfile
 kill_testproc
+
+make_testproc
+
+set pidfile [exec mktemp]
+set fh [open $pidfile w]
+puts $fh $testproc1_pid
+puts $fh $testproc2_pid
+close $fh
+
+set test "pgrep for pidfile with multiple pids"
+spawn $pgrep -F $pidfile
+expect_pass "$test" "^$testproc1_pid\\s+$testproc2_pid\\s*$"
+
+file delete $pidfile
+kill_testproc
+
+set pidfile [exec mktemp]
+
+set test "pgrep for empty pidfile"
+spawn $pgrep -F $pidfile
+expect_pass "$test" "pidfile not valid"
+
+file delete $pidfile
+
+make_testproc
+
+set pidfile [exec mktemp]
+set fh [open $pidfile w]
+puts $fh "\n$testproc1_pid"
+close $fh
+
+set test "pgrep for pidfile starting with an empty line"
+spawn $pgrep -F $pidfile
+expect_pass "$test" "pidfile not valid"
+
+file delete $pidfile
+kill_testproc
+
+make_testproc
+
+set pidfile [exec mktemp]
+set fh [open $pidfile w]
+puts $fh "$testproc1_pid\nabc"
+close $fh
+
+set test "pgrep for pidfile with non-numeric pid"
+spawn $pgrep -F $pidfile
+expect_pass "$test" "pidfile not valid"
+
+file delete $pidfile
+kill_testproc
+
