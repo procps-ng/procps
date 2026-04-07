@@ -1929,8 +1929,8 @@ static const format_struct format_array[] = { /*
 {"vm_lib",    "LIB",     pr_nop,           PIDS_VM_LIB,              5,    LNx,  PO|RIGHT},
 {"vm_lock",   "LCK",     pr_nop,           PIDS_VM_RSS_LOCKED,       3,    LNx,  PO|RIGHT},
 {"vm_stack",  "STACK",   pr_nop,           PIDS_VM_STACK,            5,    LNx,  PO|RIGHT},
-{"vsize",     "VSZ",     pr_vsz,           PIDS_VSIZE_BYTES,         6,    DEC,  PO|RIGHT}, /*vsz*/
-{"vsz",       "VSZ",     pr_vsz,           PIDS_VM_SIZE,             6,    U98,  PO|RIGHT}, /*vsize*/
+{"vsize",     "VSZ",     pr_vsz,           PIDS_VSIZE_BYTES,        10,    DEC,  PO|RIGHT}, /*vsz*/
+{"vsz",       "VSZ",     pr_vsz,           PIDS_VM_SIZE,            10,    U98,  PO|RIGHT}, /*vsize*/
 {"wbytes",    "WBYTES",  pr_wbytes,        PIDS_IO_WRITE_BYTES,      5,    LNX,  TO|RIGHT},
 {"wcbytes",   "WCBYTES", pr_wcbytes,       PIDS_IO_WRITE_CBYTES,     5,    LNX,  TO|RIGHT},
 {"wchan",     "WCHAN",   pr_wchan,         PIDS_WCHAN_NAME,          6,    XXX,  TO|WCHAN}, /* BSD n forces this to nwchan */ /* was 10 wide */
