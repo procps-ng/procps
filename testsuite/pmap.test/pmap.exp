@@ -23,6 +23,10 @@ set pmap_std_footer "total\\s+\\d+K\\s*\$"
 set pmap_device_footer "mapped:\\s+\\d+K\\s+writeable\/private:\\s+\\d+K\\s+shared:\\s+\\d+K\\s*\$"
 set pmap_ext_footer "\[ -\]+\\s+total kB\\s+\\d+(\\s+\[\\d-\]+){2,3}\\s*\$"
 
+set test "pmap list fields"
+spawn $pmap -H
+expect_pass "$test" "Address\\r\\sPerm\\r\\sOffset\\r\\sDevice\\r\\sInode\\r\\sMapping\\r\\s.+"
+
 set test "pmap with no arguments"
 spawn $pmap
 #expect_pass "$test" "^\(lt-\)\?pmap: argument missing"
@@ -134,6 +138,13 @@ if { $shmaddr == "" } {
     expect_table $test [pmap_make_generic_header $testshmproc_pid] \
         "\[^\\r=\]+\\r\\s*0*${shmaddr}\[^\\r\]+\\r" \
         "\[= \]+"
+
+    set test "pmap specified fields"
+    # pmap always prints Address.
+    spawn $pmap -f Perm,Size -A $shmaddr $testshmproc_pid
+    expect_table $test [pmap_make_name ${testshmproc_pid}] \
+        "\\s*Address\\s+Perm\\s+Size\\s*\\r\\s*0*${shmaddr}\\s+\[-rs\]+\\s+\[0-9\]+\\r" \
+        "\[= \]+\\r\\s*\[0-9\]+\\s+KB"
 }
 kill_testshm_proc
 
