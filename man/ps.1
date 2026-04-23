@@ -880,8 +880,10 @@ output into the
 .BR sort (1)
 command if you want to sort the cooked values.
 .TS
-l l lw(3i).
-\fBKEY	LONG	DESCRIPTION\fR
+Lb Lb Lb
+L  L  Lx.
+Key	Long	Description
+_
 c	cmd	simple name of executable
 C	pcpu	cpu utilization
 f	flags	flags as in long format F field
@@ -921,8 +923,10 @@ The
 .B NORMAL
 codes are described in the next section.
 .TS
-l l l.
-\fBCODE	NORMAL	HEADER\fR
+Lb Lb Lb
+L  L  L .
+Code	Normal	Header
+_
 %C	pcpu	%CPU
 %G	group	GROUP
 %P	ppid	PPID
@@ -993,7 +997,7 @@ T}
 args	COMMAND	T{
 A command with all its arguments as a string.
 Modifications to the arguments may be shown.
-The output in this column may contain spaces.
+The column contents may include spaces.
 A process marked \[lq]<defunct>\[rq] is partly dead,
 waiting to be fully destroyed by its parent.
 Sometimes the process arguments will be unavailable;
@@ -2087,7 +2091,7 @@ which could be set to Linux for normal systems.  Without that setting,
 follows the useless and bad parts of the Unix98 standard.
 .SH "PERSONALITY"
 .TS
-l	l.
+L	Lx.
 390	like the OS/390 OpenEdition \fBps\fR
 aix	like AIX \fBps\fR
 bsd	like FreeBSD \fBps\fR (totally non\-standard)
@@ -2106,7 +2110,9 @@ s390	like OS/390 Open Edition \fBps\fR
 sco	like SCO \fBps\fR
 sgi	like Irix \fBps\fR
 solaris2	like Solaris 2+ (SunOS 5) \fBps\fR
-sunos4	like SunOS 4 (Solaris 1) \fBps\fR (totally non\-standard)
+sunos4	T{
+like SunOS 4 (Solaris 1) \fBps\fR (totally non\-standard)
+T}
 svr4	standard
 sysv	standard
 tru64	like Tru64 (was Digital Unix, was OSF/1) \fBps\fR
