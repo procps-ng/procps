@@ -376,15 +376,25 @@ PROCPS_EXPORT int procps_uptime_snprint(
         pos += l;
     }
 
+/* Fetch CPU count to provide context for load averages */
+    int cpus = sysconf(_SC_NPROCESSORS_ONLN);
+
     procps_loadavg(&av1, &av5, &av15);
-    if ( (l = snprintf(str+pos, size-pos, "load average: %.2f, %.2f, %.2f",
-                    av1, av5, av15)) >= size-pos)
+
+    if (cpus > 0) {
+        l = snprintf(str+pos, size-pos, "(%d CPUs), load average: %.2f, %.2f, %.2f",
+                     cpus, av1, av5, av15);
+    } else {
+        l = snprintf(str+pos, size-pos, "load average: %.2f, %.2f, %.2f",
+                     av1, av5, av15);
+    }
+
+    if (l >= size-pos)
         return size;
     pos += l;
 
     return pos;
 }
-
 /*
  * procps_uptime_sprint:
  *
@@ -422,3 +432,4 @@ PROCPS_EXPORT char *procps_uptime_sprint_short(void)
     procps_uptime_snprint( shortbuf, UPTIME_BUFLEN, uptime_secs, 1);
     return shortbuf;
 }
+
