@@ -6108,6 +6108,7 @@ static void keys_task (int ch) {
 #endif
                if (p >= w->procflgs) {
                   w->rc.sortindx = *p;
+                  w->begtask = 0;
 #ifndef TREE_NORESET
                   OFFw(w, Show_FOREST);
 #endif
@@ -6129,6 +6130,7 @@ static void keys_task (int ch) {
 #endif
                if (p < w->procflgs + w->maxpflgs) {
                   w->rc.sortindx = *p;
+                  w->begtask = 0;
 #ifndef TREE_NORESET
                   OFFw(w, Show_FOREST);
 #endif
@@ -6451,6 +6453,7 @@ static void keys_xtra (int ch) {
       default:                    // keep gcc happy
          break;
    }
+   w->begtask = 0;
 // some have objected to this message, so we'll just keep silent...
 // show_msg(fmtmk("%s sort compatibility key honored", xmsg));
 } // end: keys_xtra
