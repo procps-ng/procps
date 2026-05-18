@@ -6171,14 +6171,17 @@ static void keys_task (int ch) {
          break;
       case 'R':
 #ifdef TREE_NORESET
-         if (!CHKw(w, Show_FOREST)) VIZTOGw(w, Qsrt_NORMAL);
+         if (!CHKw(w, Show_FOREST)) {
+            VIZTOGw(w, Qsrt_NORMAL);
+            w->begtask = 0;
+         }
 #else
          if (VIZCHKw(w)) {
             TOGw(w, Qsrt_NORMAL);
             OFFw(w, Show_FOREST);
+            w->begtask = 0;
          }
 #endif
-         w->begtask = 0;
          break;
       case 'S':
          if (VIZCHKw(w)) {
@@ -6208,8 +6211,8 @@ static void keys_task (int ch) {
                show_msg(fmtmk(N_fmt(FOREST_modes_fmt) , CHKw(w, Show_FOREST)
                   ? N_txt(ON_word_only_txt) : N_txt(OFF_one_word_txt)));
             if (!CHKw(w, Show_FOREST)) w->focus_pid = 0;
+            w->begtask = 0;
          }
-         w->begtask = 0;
          break;
       case 'v':
          if (VIZCHKw(w)) {
