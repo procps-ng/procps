@@ -42,6 +42,9 @@
 #include "procps-private.h"
 #include "pids.h"
 
+#ifndef CLOCK_BOOTTIME
+#define CLOCK_BOOTTIME CLOCK_MONOTONIC
+#endif
 
 //#define UNREF_RPTHASH                // report hash details at uref() time
 

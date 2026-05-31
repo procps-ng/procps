@@ -44,6 +44,10 @@
 #include "procps-private.h"
 #include "pids.h"
 
+#ifndef CLOCK_BOOTTIME
+#define CLOCK_BOOTTIME CLOCK_MONOTONIC
+#endif
+
 #define UPTIME_FILE "/proc/uptime"
 
 #define UPTIME_BUFLEN 256
