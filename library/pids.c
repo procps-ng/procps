@@ -1034,16 +1034,7 @@ static inline int pids_items_check_failed (
 {
     int i;
 
-    /* if an enum is passed instead of an address of one or more enums, ol' gcc
-     * will silently convert it to an address (possibly NULL).  only clang will
-     * offer any sort of warning like the following:
-     *
-     * warning: incompatible integer to pointer conversion passing 'int' to parameter of type 'enum pids_item *'
-     * if (procps_pids_new(&info, PIDS_noop, 3) < 0)
-     *                            ^~~~~~~~~~~~~~~~
-     */
-    if (numitems < 1
-    || (void *)items < (void *)0x8000)      // twice as big as our largest enum
+    if (numitems < 1 || items == NULL)
         return 1;
 
     for (i = 0; i < numitems; i++) {
