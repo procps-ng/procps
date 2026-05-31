@@ -35,6 +35,10 @@
 #include <string.h>
 #include <sys/mman.h>
 
+#ifndef MAP_HUGETLB
+#define MAP_HUGETLB 0
+#endif
+
 #define LENGTH (2*1024*1024)
 
 void usage(const char *progname, const char *msg)
