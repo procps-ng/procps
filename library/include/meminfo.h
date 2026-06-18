@@ -204,6 +204,7 @@ struct meminfo_info;
 int procps_meminfo_new   (struct meminfo_info **info);
 int procps_meminfo_ref   (struct meminfo_info  *info);
 int procps_meminfo_unref (struct meminfo_info **info);
+int cgroup_meminfo_new (struct meminfo_info **info);
 
 struct meminfo_result *procps_meminfo_get (
     struct meminfo_info *info,

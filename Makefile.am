@@ -304,6 +304,7 @@ library_libproc2_la_LDFLAGS = \
 library_libproc2_la_SOURCES = \
 	library/capname.c \
         local/capnames.h \
+	library/cgmeminfo.c \
 	library/devname.c \
 	library/include/devname.h \
 	library/diskstats.c \
@@ -399,7 +400,8 @@ check_PROGRAMS += \
 	library/tests/test_uptime \
 	library/tests/test_sysinfo \
 	library/tests/test_version \
-	library/tests/test_namespace
+	library/tests/test_namespace \
+	library/tests/test_cgmeminfo
 
 library_tests_test_Itemtables_SOURCES = library/tests/test_Itemtables.c
 library_tests_test_Itemtables_LDADD = library/libproc2.la
@@ -413,6 +415,8 @@ library_tests_test_version_SOURCES = library/tests/test_version.c
 library_tests_test_version_LDADD = library/libproc2.la
 library_tests_test_namespace_SOURCES = library/tests/test_namespace.c
 library_tests_test_namespace_LDADD = library/libproc2.la
+library_tests_test_cgmeminfo_SOURCES = library/tests/test_cgmeminfo.c
+library_tests_test_cgmeminfo_LDADD = library/libproc2.la
 
 if CYGWIN
 	src_skill_LDADD = $(CYGWINFLAGS)
@@ -450,6 +454,7 @@ TESTS = \
 	library/tests/test_sysinfo \
 	library/tests/test_version \
 	library/tests/test_namespace \
+	library/tests/test_cgmeminfo \
 	src/tests/test_fileutils \
 	src/tests/test_strtod_nol
 
