@@ -59,6 +59,10 @@
 #include "top.h"
 #include "top_nls.h"
 
+#ifndef CLOCK_BOOTTIME
+#define CLOCK_BOOTTIME CLOCK_MONOTONIC
+#endif
+
 /*######  Miscellaneous global stuff  ####################################*/
 
         /* The original and new terminal definitions

@@ -61,6 +61,10 @@ extern void __cyg_profile_func_enter(void*,void*);
 #define LEAVE(x)
 #endif
 
+#ifndef O_PATH
+#define O_PATH O_NORW
+#endif
+
 #ifdef FALSE_THREADS
 #define IS_THREAD(q) ( q->tid != q->tgid )
 #endif
