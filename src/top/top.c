@@ -6108,6 +6108,7 @@ static void keys_task (int ch) {
 #endif
                if (p >= w->procflgs) {
                   w->rc.sortindx = *p;
+                  w->begtask = 0;
 #ifndef TREE_NORESET
                   OFFw(w, Show_FOREST);
 #endif
@@ -6129,6 +6130,7 @@ static void keys_task (int ch) {
 #endif
                if (p < w->procflgs + w->maxpflgs) {
                   w->rc.sortindx = *p;
+                  w->begtask = 0;
 #ifndef TREE_NORESET
                   OFFw(w, Show_FOREST);
 #endif
@@ -6169,11 +6171,15 @@ static void keys_task (int ch) {
          break;
       case 'R':
 #ifdef TREE_NORESET
-         if (!CHKw(w, Show_FOREST)) VIZTOGw(w, Qsrt_NORMAL);
+         if (!CHKw(w, Show_FOREST)) {
+            VIZTOGw(w, Qsrt_NORMAL);
+            w->begtask = 0;
+         }
 #else
          if (VIZCHKw(w)) {
             TOGw(w, Qsrt_NORMAL);
             OFFw(w, Show_FOREST);
+            w->begtask = 0;
          }
 #endif
          break;
@@ -6205,6 +6211,7 @@ static void keys_task (int ch) {
                show_msg(fmtmk(N_fmt(FOREST_modes_fmt) , CHKw(w, Show_FOREST)
                   ? N_txt(ON_word_only_txt) : N_txt(OFF_one_word_txt)));
             if (!CHKw(w, Show_FOREST)) w->focus_pid = 0;
+            w->begtask = 0;
          }
          break;
       case 'v':
@@ -6451,6 +6458,7 @@ static void keys_xtra (int ch) {
       default:                    // keep gcc happy
          break;
    }
+   w->begtask = 0;
 // some have objected to this message, so we'll just keep silent...
 // show_msg(fmtmk("%s sort compatibility key honored", xmsg));
 } // end: keys_xtra
