@@ -177,8 +177,12 @@ PROCPS_EXPORT int procps_container_uptime(
     if (!uptime_secs)
         return 0; //valid, but odd call
 
+#ifdef CLOCK_BOOTTIME
     if ( (rv = clock_gettime(CLOCK_BOOTTIME, &tp) < 0))
         return rv;
+#else
+        return -1;
+#endif
 
     if ( (rv = procps_pids_new(&info, items, 1) < 0))
         return rv;
