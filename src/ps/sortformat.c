@@ -418,7 +418,9 @@ static const char *long_sort_parse(sf_node *sfn){
     endp = snode; while(endp->next) endp = endp->next;  /* find end */
     endp->next = sfn->s_cooked;
     sfn->s_cooked = snode;
-    walk = sep_loc + 1; /* point to next item, if any */
+    if(items){
+      walk = sep_loc + 1; /* point to next item, if any */
+    }
   }
   free(buf);
   already_parsed_sort = 1;
